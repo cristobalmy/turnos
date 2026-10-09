@@ -120,3 +120,12 @@ input{background:var(--card);color:var(--txt)}
 .cal td.sel.libre{background:repeating-linear-gradient(45deg,var(--selA),var(--selA) 4px,var(--selB) 4px,var(--selB) 8px)}
 .opciones{display:flex;gap:.4rem;margin:.4rem 0 .2rem}.opciones button{flex:1}
 .opciones .btn.act{background:var(--azul2);color:#fff}
+
+/* ---- resaltar la fila de una persona ---- */
+.cal .nom{cursor:pointer}
+.cal thead .nom,.cal tfoot .nom,.cal tr.turno .nom{cursor:default}
+.cal.conSel tbody tr:not(.fsel):not(.turno){opacity:.4}
+.cal tr.fsel td{background:var(--azul-claro);box-shadow:inset 0 2px 0 var(--azul2),inset 0 -2px 0 var(--azul2)}
+.cal tr.fsel td.libre{background:repeating-linear-gradient(45deg,var(--selA),var(--selA) 4px,var(--selB) 4px,var(--selB) 8px)}
+.cal tr.fsel .nom{background:var(--azul2);color:#fff}
+.cal tr.fsel .nom::before{content:""}

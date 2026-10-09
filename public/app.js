@@ -197,8 +197,8 @@ function vistaCalendario() {
     const f = fechaStr(S.y, S.m, d), t = tl(S.dias[f]);
     return h("td", { class: cls(d, f) }, h("span", { class: "tur " + t }, t));
   }));
-  const tbody = h("tbody", {}, filaTurno, S.emps.map(e => h("tr", { class: e.id === S.me.id ? "yo" : "" },
-    h("th", { class: "nom" }, e.nombre),
+  const tbody = h("tbody", {}, filaTurno, S.emps.map(e => h("tr", { class: (e.id === S.me.id ? "yo " : "") + (e.id === S.fsel ? "fsel" : "") },
+    h("th", { class: "nom", title: "Resaltar su fila", onclick: () => { S.fsel = S.fsel === e.id ? null : e.id; pintar(); } }, e.nombre),
     dias.map(d => {
       const f = fechaStr(S.y, S.m, d), c = S.asig[e.id + "|" + f], t = S.dias[f];
       return h("td", { class: "dia " + cls(d, f) + (t === "S" || t === "L" ? " libre" : ""), onclick: () => { S.sel = f; abrirEdicion(e, f); } },
@@ -215,9 +215,9 @@ function vistaCalendario() {
       h("button", { class: "hoybtn", onclick: () => irMes(0, true) }, "Hoy")),
     h("div", { class: "resumen" }, resumenDia()),
     h("div", { style: "height:.7rem" }),
-    h("div", { class: "wrap" }, h("table", { class: "cal" }, thead, tbody, tfoot)),
+    h("div", { class: "wrap" }, h("table", { class: "cal" + (S.fsel ? " conSel" : "") }, thead, tbody, tfoot)),
     h("div", { class: "leyenda" }, h("span", { class: "a" }, "Vacaciones y permisos"), h("span", { class: "t" }, "Trabajo"), h("span", { class: "e" }, "Otros"), h("span", { class: "l" }, "Día libre (L)"),
-      h("span", {}, esResp() ? "Toca una casilla para poner o quitar un código. Toca un día arriba para ver su resumen." : "Toca una casilla tuya para poner o quitar un código.")));
+      h("span", {}, (esResp() ? "Toca una casilla para poner o quitar un código. " : "Toca una casilla tuya para poner o quitar un código. ") + "Toca un nombre para resaltar su fila y un día arriba para ver su resumen.")));
 }
 
 const GRUPOS = [["Ausencia Justificada", "Vacaciones y permisos"], ["Tipo trabajo", "Trabajo"], ["Especial", "Otros"]];
