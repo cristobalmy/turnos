@@ -44,6 +44,12 @@ select pg_temp.chk(pg_temp.filas($$update config set valor='1' where clave='mini
 select pg_temp.chk((select count(*) from cambios where hecho_por=4) = 3, 'sus 3 cambios quedan en el historial');
 rollback;
 
+\echo == Quien no hace PICO
+begin; update empleados set hace_pico=false where nombre='Cristobal';
+select pg_temp.chk(pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values (1,'2026-12-01','PICO')$$), 'no se puede poner PICO a quien no lo hace');
+select pg_temp.chk(not pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values (1,'2026-12-01','V1')$$), 'pero sí otros códigos');
+rollback;
+
 \echo == Responsable (Nacho, id 3)
 begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"NACHO@t.es"}',true);
 select pg_temp.chk(not pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values (4,'2026-11-02','PICO')$$), 'puede poner PICO a otra persona (el email no distingue mayúsculas)');

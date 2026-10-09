@@ -127,6 +127,7 @@ function trabaja(empId, f) {
 function candidatosPico(f) {
   // libre (sin código) y su pareja ausente
   return S.emps.filter(e => {
+    if (e.hace_pico === false) return false;
     if (S.asig[e.id + "|" + f]) return false;
     if (!e.pareja_id) return false;
     const cp = S.asig[e.pareja_id + "|" + f];
@@ -244,7 +245,7 @@ function abrirEdicion(emp, f) {
   const [y, m, d] = f.split("-").map(Number);
   const elegir = async (codigo, btn) => { btn.disabled = true; await guardar(emp, f, codigo); dlg.close(); };
   const secciones = GRUPOS.map(([tipo, titulo]) => {
-    const lista = Object.values(S.cods).filter(c => c.tipo === tipo && (esResp() || !c.solo_responsables));
+    const lista = Object.values(S.cods).filter(c => c.tipo === tipo && (esResp() || !c.solo_responsables) && !(c.codigo === "PICO" && emp.hace_pico === false));
     if (!lista.length) return null;
     return [h("h4", {}, titulo), h("div", { class: "chips" }, lista.map(c =>
       h("button", { class: `chip ${claseTipo(c.codigo)} ${c.codigo === actual ? "act" : ""}`, onclick: ev => elegir(c.codigo, ev.currentTarget) },
