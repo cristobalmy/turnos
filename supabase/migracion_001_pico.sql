@@ -1,6 +1,6 @@
 -- Cristobal nunca hace PICO. Ejecutar una vez en el SQL Editor de Supabase.
 alter table public.empleados add column if not exists hace_pico boolean not null default true;
-update public.empleados set hace_pico = false where nombre = 'Cristobal';
+update public.empleados set hace_pico = false where id = 1; -- Cristobal
 
 create or replace function public.asignaciones_antes() returns trigger
 language plpgsql security definer set search_path = public as $$
