@@ -1,5 +1,5 @@
 :root{--cab:#0f2a4a;--fondo:#f6f8fb;--card:#fff;--linea:#eceff3;--hov:var(--hov);--finde:#f7f9fc;--rayaA:#f4f6f9;--rayaB:#e9edf2;--selA:#e3eefb;--selB:#d3e3f7;--bajo:#fbd5d0;--azul:#0f2a4a;--azul2:#2f7bd8;--azul-claro:#e8f1fd;--gris:#eef1f5;--borde:#dde2e9;--txt:#1b2733;--suave:#6a7684;--rojo:#c0392b;--verde:#1e8e4e;
- --aus:#cfe3fb;--aus-t:#0c3b7a;--trab:#123a6b;--trab-t:#fff;--mod:#111;--mod-t:#fff;--esp:#f8d4d0;--esp-t:#8a1c12}
+ --aus:#cfe3fb;--aus-t:#0c3b7a;--trab:#2563b8;--trab-t:#fff;--mod:#111;--mod-t:#fff;--esp:#f8d4d0;--esp-t:#8a1c12}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%}
 body{font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--txt);background:var(--fondo)}
@@ -113,7 +113,7 @@ dialog .contenido:focus{outline:none}
 /* ---- modo oscuro ---- */
 :root[data-tema=oscuro]{color-scheme:dark;--cab:#0a1424;--fondo:#0d1420;--card:#151f30;--linea:#1f2b40;--hov:#1b2943;--finde:#121b2b;--rayaA:#111a29;--rayaB:#192437;--selA:#1a2c4a;--selB:#223a5f;--bajo:#4d2323;
  --azul:#a9c8f5;--azul2:#4a90e2;--azul-claro:#1b2c47;--gris:#222e45;--borde:#2a374e;--txt:#e6ebf5;--suave:#8d9ab3;--rojo:#ff7b6b;--verde:#4fd08a;
- --aus:#24446f;--aus-t:#c4dcff;--trab:#2559a3;--trab-t:#fff;--mod:#04070c;--mod-t:#fff;--esp:#5a2321;--esp-t:#ffbdb5}
+ --aus:#24446f;--aus-t:#c4dcff;--trab:#3171c9;--trab-t:#fff;--mod:#04070c;--mod-t:#fff;--esp:#5a2321;--esp-t:#ffbdb5}
 dialog{background:var(--card);color:var(--txt)}
 input{background:var(--card);color:var(--txt)}
 .cal td.libre{background:repeating-linear-gradient(45deg,var(--rayaA),var(--rayaA) 4px,var(--rayaB) 4px,var(--rayaB) 8px)}
