@@ -16,7 +16,7 @@ function h(tag, attrs, ...kids) {
     else if (k === "class") e.className = v;
     else if (v !== false && v != null) e.setAttribute(k, v);
   }
-  for (const c of kids.flat()) if (c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(c));
+  for (const c of kids.flat(Infinity)) if (c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(c));
   return e;
 }
 const pad = n => String(n).padStart(2, "0");
@@ -43,7 +43,7 @@ function pantallaLogin(msg) {
     if (error) err.textContent = "Correo o contraseña incorrectos.";
     else arrancar();
   } }, email, pass, h("button", { class: "btn full", type: "submit" }, "Entrar"), err);
-  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Turno D"), h("div", {}, "Usera – Villaverde"), f));
+  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Turno D"), h("div", { class: "sub" }, "Usera – Villaverde"), f));
 }
 
 async function arrancar() {
@@ -62,7 +62,7 @@ async function arrancar() {
   if (mc) S.minimo = +mc.valor || 6;
   S.me = S.emps.find(x => (x.email || "").toLowerCase() === email) || null;
   if (!S.me) return sinAcceso("Tu cuenta no está autorizada en Turno D. Habla con un responsable.");
-  const t = new Date(); S.y = t.getFullYear(); S.m = t.getMonth();
+  const t = new Date(); S.y = t.getFullYear(); S.m = t.getMonth(); S.sel = hoyStr();
   await cargarMes();
   suscribir();
   pintar();
@@ -121,74 +121,123 @@ function candidatosPico(f) {
 }
 
 // ---------- pantallas ----------
+const ICON = {
+  cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  hist: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
+  cuenta: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+};
+const icono = k => { const s = document.createElement("span"); s.innerHTML = `<svg viewBox="0 0 24 24">${ICON[k]}</svg>`; return s.firstChild; };
+const TURNO_NOMBRE = { M: "Mañana", T: "Tarde", N: "Noche", S: "Libre", L: "Libre" };
+const tl = t => (t === "S" ? "L" : t || "");      // la "S" (saliente) se muestra como "L" (libre)
+const DLARGO = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
+
 function cabecera() {
-  const b = (v, txt) => h("button", { class: S.vista === v ? "on" : "", onclick: () => { S.vista = v; pintar(); } }, txt);
-  return h("header", {}, h("h1", {}, "Turno D"), b("cal", "Calendario"), b("hist", "Cambios"), b("cuenta", "Cuenta"));
+  const b = (v, txt) => h("button", { class: S.vista === v ? "on" : "", onclick: () => { S.vista = v; pintar(); } }, icono(v), txt);
+  return h("header", {},
+    h("div", { class: "marca" }, h("i", {}, "D"), "Turno D"),
+    h("nav", { class: "tabs" }, b("cal", "Calendario"), b("hist", "Cambios"), b("cuenta", "Cuenta")),
+    h("span", { class: "yo" }, S.me.nombre));
 }
 function pintar() {
+  const w = $app.querySelector(".wrap");
+  const pos = w ? [w.scrollLeft, w.scrollTop] : null;
   const cuerpo = S.vista === "cal" ? vistaCalendario() : S.vista === "hist" ? vistaHistorial() : vistaCuenta();
   $app.replaceChildren(cabecera(), cuerpo);
-  if (S.vista === "cal") {
-    const hoy = $app.querySelector("th.hoy");
-    if (hoy && !S.yaScroll) { hoy.scrollIntoView({ inline: "center", block: "nearest" }); S.yaScroll = true; }
-  }
+  if (S.vista !== "cal") return;
+  const nw = $app.querySelector(".wrap");
+  if (!S.yaScroll) {
+    const hoy = $app.querySelector("th.hoy") || $app.querySelector("th.sel");
+    if (hoy) nw.scrollLeft = Math.max(0, hoy.offsetLeft - nw.clientWidth / 2);
+    S.yaScroll = true;
+  } else if (pos) { nw.scrollLeft = pos[0]; nw.scrollTop = pos[1]; }
+}
+
+function resumenDia() {
+  const f = S.sel, [y, m, d] = f.split("-").map(Number), t = S.dias[f];
+  const dow = DLARGO[new Date(y, m - 1, d).getDay()];
+  const titulo = `${dow[0].toUpperCase() + dow.slice(1)} ${d} de ${MESES[m - 1]}`;
+  if (t !== "M" && t !== "T" && t !== "N")
+    return h("div", { class: "card" }, h("div", {}, h("div", { class: "tit" }, titulo), h("span", { class: "pill" }, "Día libre del ciclo")),
+      h("div", { class: "det" }, "Sin servicio este día."));
+  const n = S.emps.filter(e => trabaja(e.id, f)).length;
+  const aus = S.emps.filter(e => { const c = S.asig[e.id + "|" + f]; return c && !(S.cods[c] && S.cods[c].cuenta_como_trabajo); })
+    .map(e => `${e.nombre} (${S.asig[e.id + "|" + f]})`);
+  const con = c => S.emps.filter(e => S.asig[e.id + "|" + f] === c).map(e => e.nombre);
+  const extra = ["PICO", "DESP"].filter(c => con(c).length).map(c => `${c}: ${con(c).join(", ")}`);
+  return h("div", { class: "card" },
+    h("div", {}, h("div", { class: "tit" }, titulo), h("span", { class: "pill" }, "Turno " + TURNO_NOMBRE[t].toLowerCase())),
+    h("div", {}, h("div", { class: "grande " + (n < S.minimo ? "bajo" : "ok") }, `${n}/${S.emps.length}`), h("small", { class: "det" }, `trabajan (mín. ${S.minimo})`)),
+    h("div", { class: "det" }, aus.length ? "Ausentes: " + aus.join(" · ") : "Nadie ausente.", extra.length ? h("div", {}, extra.join(" · ")) : null));
 }
 
 function vistaCalendario() {
   const nd = new Date(S.y, S.m + 1, 0).getDate(), hoy = hoyStr();
   const dias = Array.from({ length: nd }, (_, i) => i + 1);
-  const cls = (d, f) => [new Date(S.y, S.m, d).getDay() % 6 === 0 ? "finde" : "", f === hoy ? "hoy" : ""].join(" ");
-  const cambiarMes = async dm => {
-    S.m += dm; if (S.m < 0) { S.m = 11; S.y--; } if (S.m > 11) { S.m = 0; S.y++; }
-    S.yaScroll = true; await cargarMes(); pintar();
+  const cls = (d, f) => [new Date(S.y, S.m, d).getDay() % 6 === 0 ? "finde" : "", f === hoy ? "hoy" : "", f === S.sel ? "sel" : ""].join(" ");
+  const irMes = async (dm, aHoy) => {
+    if (aHoy) { const t = new Date(); S.y = t.getFullYear(); S.m = t.getMonth(); }
+    else { S.m += dm; if (S.m < 0) { S.m = 11; S.y--; } if (S.m > 11) { S.m = 0; S.y++; } }
+    const h0 = hoyStr();
+    S.sel = h0.startsWith(`${S.y}-${pad(S.m + 1)}`) ? h0 : fechaStr(S.y, S.m, 1);
+    S.yaScroll = false; await cargarMes(); pintar();
   };
   const thead = h("thead", {}, h("tr", {}, h("th", { class: "nom" }, ""), dias.map(d => {
     const f = fechaStr(S.y, S.m, d);
-    return h("th", { class: cls(d, f) }, DSEM[new Date(S.y, S.m, d).getDay()], h("small", {}, d));
+    return h("th", { class: cls(d, f), onclick: () => { S.sel = f; pintar(); } }, DSEM[new Date(S.y, S.m, d).getDay()], h("small", {}, d));
   })));
-  const filaTurno = h("tr", {}, h("th", { class: "nom" }, "Turno"), dias.map(d => {
-    const f = fechaStr(S.y, S.m, d), t = S.dias[f] || "";
+  const filaTurno = h("tr", { class: "turno" }, h("th", { class: "nom" }, "Turno"), dias.map(d => {
+    const f = fechaStr(S.y, S.m, d), t = tl(S.dias[f]);
     return h("td", { class: cls(d, f) }, h("span", { class: "tur " + t }, t));
   }));
   const tbody = h("tbody", {}, filaTurno, S.emps.map(e => h("tr", { class: e.id === S.me.id ? "yo" : "" },
     h("th", { class: "nom" }, e.nombre),
     dias.map(d => {
       const f = fechaStr(S.y, S.m, d), c = S.asig[e.id + "|" + f], t = S.dias[f];
-      return h("td", { class: "dia " + cls(d, f) + (t === "S" || t === "L" ? " libre" : ""), onclick: () => abrirEdicion(e, f) },
+      return h("td", { class: "dia " + cls(d, f) + (t === "S" || t === "L" ? " libre" : ""), onclick: () => { S.sel = f; abrirEdicion(e, f); } },
         c ? h("span", { class: "cod " + claseTipo(c) }, c) : "");
     }))));
-  const tfoot = h("tfoot", {}, h("tr", {}, h("th", { class: "nom" }, `Trabajan (mín. ${S.minimo})`), dias.map(d => {
+  const tfoot = h("tfoot", {}, h("tr", {}, h("th", { class: "nom" }, "Trabajan"), dias.map(d => {
     const f = fechaStr(S.y, S.m, d), t = S.dias[f];
     if (t !== "M" && t !== "T" && t !== "N") return h("td", { class: cls(d, f) }, "–");
     const n = S.emps.filter(e => trabaja(e.id, f)).length;
     return h("td", { class: n < S.minimo ? "bajo" : "ok" }, n);
   })));
   return h("div", {},
-    h("div", { class: "mes" }, h("button", { onclick: () => cambiarMes(-1) }, "‹"), h("b", {}, `${MESES[S.m]} ${S.y}`), h("button", { onclick: () => cambiarMes(1) }, "›")),
+    h("div", { class: "mes" }, h("button", { onclick: () => irMes(-1) }, "‹"), h("b", {}, `${MESES[S.m]} ${S.y}`), h("button", { onclick: () => irMes(1) }, "›"),
+      h("button", { class: "hoybtn", onclick: () => irMes(0, true) }, "Hoy")),
+    h("div", { class: "resumen" }, resumenDia()),
+    h("div", { style: "height:.7rem" }),
     h("div", { class: "wrap" }, h("table", { class: "cal" }, thead, tbody, tfoot)),
-    h("p", { class: "ayuda" }, esResp() ? "Toca cualquier casilla para poner o quitar un código." : "Toca una casilla tuya para poner o quitar un código. Las casillas rayadas son días de descanso del ciclo."));
+    h("div", { class: "leyenda" }, h("span", { class: "a" }, "Vacaciones y permisos"), h("span", { class: "t" }, "Trabajo"), h("span", { class: "e" }, "Otros"), h("span", { class: "l" }, "Día libre (L)"),
+      h("span", {}, esResp() ? "Toca una casilla para poner o quitar un código. Toca un día arriba para ver su resumen." : "Toca una casilla tuya para poner o quitar un código.")));
 }
 
+const GRUPOS = [["Ausencia Justificada", "Vacaciones y permisos"], ["Tipo trabajo", "Trabajo"], ["Especial", "Otros"]];
 function abrirEdicion(emp, f) {
   const puede = esResp() || emp.id === S.me.id;
   const actual = S.asig[emp.id + "|" + f] || "";
   const bloqueado = !esResp() && actual && S.cods[actual] && S.cods[actual].solo_responsables;
-  if (!puede) { toast(`Solo ${emp.nombre} o un responsable pueden cambiar este día`, 2500); return; }
-  if (bloqueado) { toast(`${actual} lo ha puesto un responsable; solo ellos pueden cambiarlo`, 3500); return; }
-  const sel = h("select", {}, h("option", { value: "" }, "— Sin código (día normal) —"),
-    Object.values(S.cods).filter(c => esResp() || !c.solo_responsables)
-      .map(c => h("option", { value: c.codigo, selected: c.codigo === actual }, `${c.codigo} · ${c.descripcion}`)));
+  if (!puede) { pintar(); toast(`Solo ${emp.nombre} o un responsable pueden cambiar este día`, 2500); return; }
+  if (bloqueado) { pintar(); toast(`${actual} lo ha puesto un responsable; solo ellos pueden cambiarlo`, 3500); return; }
   const dlg = h("dialog", {});
   const [y, m, d] = f.split("-").map(Number);
-  const cand = esResp() && !actual && ["M","T","N"].includes(S.dias[f]) ? candidatosPico(f) : [];
-  dlg.append(
-    h("h3", {}, emp.nombre), h("p", { class: "sub" }, `${DSEM[new Date(y, m - 1, d).getDay()]} ${d}/${m}/${y} · turno ${S.dias[f] || "?"}`),
-    sel,
+  const elegir = async (codigo, btn) => { btn.disabled = true; await guardar(emp, f, codigo); dlg.close(); };
+  const secciones = GRUPOS.map(([tipo, titulo]) => {
+    const lista = Object.values(S.cods).filter(c => c.tipo === tipo && (esResp() || !c.solo_responsables));
+    if (!lista.length) return null;
+    return [h("h4", {}, titulo), h("div", { class: "chips" }, lista.map(c =>
+      h("button", { class: `chip ${claseTipo(c.codigo)} ${c.codigo === actual ? "act" : ""}`, onclick: ev => elegir(c.codigo, ev.currentTarget) },
+        h("b", {}, c.codigo), h("span", {}, c.descripcion))))];
+  });
+  const cand = esResp() && !actual && ["M", "T", "N"].includes(S.dias[f]) ? candidatosPico(f) : [];
+  dlg.append(...[
+    h("h3", {}, emp.nombre), h("p", { class: "sub" }, `${DLARGO[new Date(y, m - 1, d).getDay()]} ${d}/${m}/${y} · turno ${TURNO_NOMBRE[S.dias[f]] ? TURNO_NOMBRE[S.dias[f]].toLowerCase() : "?"}`),
     cand.length ? h("div", { class: "cand" }, "Candidatos a PICO (libres con pareja ausente): " + cand.map(c => c.nombre).join(", ")) : null,
+    h("div", { class: "contenido" }, secciones),
     h("div", { class: "fila" },
-      h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cancelar"),
-      h("button", { class: "btn", onclick: async ev => { ev.target.disabled = true; await guardar(emp, f, sel.value); dlg.close(); } }, "Guardar")));
-  dlg.addEventListener("close", () => dlg.remove());
+      h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cerrar"),
+      actual ? h("button", { class: "btn sec", onclick: ev => elegir("", ev.currentTarget) }, "Quitar código") : null)].filter(Boolean));
+  dlg.addEventListener("close", () => { dlg.remove(); pintar(); });
   document.body.append(dlg); dlg.showModal();
 }
 

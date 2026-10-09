@@ -1,5 +1,5 @@
 // Service worker mínimo: guarda la "cáscara" de la app para abrirla rápido. Los datos siempre vienen de internet.
-const V = "turnos-v1";
+const V = "turnos-v2";
 const SHELL = ["./", "index.html", "app.js", "style.css", "config.js", "icon.svg", "manifest.webmanifest"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(V).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener("activate", e => {
