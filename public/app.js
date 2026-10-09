@@ -4,7 +4,7 @@ const { SUPABASE_URL, SUPABASE_KEY } = window.TURNOS_CONFIG;
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 const $app = document.getElementById("app");
 
-const S = { me: null, emps: [], cods: {}, minimo: 6, y: 0, m: 0, dias: {}, asig: {}, vista: "cal", canal: null };
+const S = { me: null, emps: [], cods: {}, minimo: 6, tercio: 4, y: 0, m: 0, dias: {}, asig: {}, vista: "cal", canal: null };
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DSEM = ["D","L","M","X","J","V","S"];
 
@@ -68,6 +68,8 @@ async function arrancar() {
   S.cods = Object.fromEntries(c.data.map(x => [x.codigo, x]));
   const mc = (cfg.data || []).find(x => x.clave === "minimo_operativo");
   if (mc) S.minimo = +mc.valor || 6;
+  const tc = (cfg.data || []).find(x => x.clave === "tercio");
+  if (tc) S.tercio = +tc.valor || 4;
   S.me = S.emps.find(x => (x.email || "").toLowerCase() === email) || null;
   if (!S.me) return sinAcceso("Tu cuenta no está autorizada en Turno D. Habla con un responsable.");
   const t = new Date(); S.y = t.getFullYear(); S.m = t.getMonth(); S.sel = hoyStr();
@@ -114,6 +116,10 @@ function suscribir() {
 }
 
 // ---------- cálculo ----------
+// Tercio: personas con una ausencia justificada (vacaciones, AP, CH, CJ, JS, SS, NAV) ese día.
+function enTercio(f) {
+  return S.emps.filter(e => { const c = S.asig[e.id + "|" + f]; return c && S.cods[c] && S.cods[c].tipo === "Ausencia Justificada"; }).length;
+}
 function trabaja(empId, f) {
   const c = S.asig[empId + "|" + f];
   return !c || !!(S.cods[c] && S.cods[c].cuenta_como_trabajo);
@@ -175,6 +181,7 @@ function resumenDia() {
   return h("div", { class: "card" },
     h("div", {}, h("div", { class: "tit" }, titulo), h("span", { class: "pill" }, "Turno " + TURNO_NOMBRE[t].toLowerCase())),
     h("div", {}, h("div", { class: "grande " + (n < S.minimo ? "bajo" : "ok") }, `${n}/${S.emps.length}`), h("small", { class: "det" }, `trabajan (mín. ${S.minimo})`)),
+    h("div", {}, h("div", { class: "grande " + (enTercio(f) > S.tercio ? "bajo" : "ok") }, `${enTercio(f)}/${S.tercio}`), h("small", { class: "det" }, "tercio")),
     h("div", { class: "det" }, aus.length ? "Ausentes: " + aus.join(" · ") : "Nadie ausente.", extra.length ? h("div", {}, extra.join(" · ")) : null));
 }
 
@@ -204,7 +211,13 @@ function vistaCalendario() {
       return h("td", { class: "dia " + cls(d, f) + (t === "S" || t === "L" ? " libre" : ""), onclick: () => { S.sel = f; abrirEdicion(e, f); } },
         c ? h("span", { class: "cod " + claseTipo(c) }, c) : "");
     }))));
-  const tfoot = h("tfoot", {}, h("tr", {}, h("th", { class: "nom" }, "Trabajan"), dias.map(d => {
+  const filaTercio = h("tr", {}, h("th", { class: "nom", title: "Ausentes por vacaciones o permisos" }, `Tercio (máx. ${S.tercio})`), dias.map(d => {
+    const f = fechaStr(S.y, S.m, d), t = S.dias[f];
+    if (t !== "M" && t !== "T" && t !== "N") return h("td", { class: cls(d, f) }, "–");
+    const n = enTercio(f);
+    return h("td", { class: n > S.tercio ? "bajo" : "ok" }, n);
+  }));
+  const tfoot = h("tfoot", {}, filaTercio, h("tr", {}, h("th", { class: "nom" }, "Trabajan"), dias.map(d => {
     const f = fechaStr(S.y, S.m, d), t = S.dias[f];
     if (t !== "M" && t !== "T" && t !== "N") return h("td", { class: cls(d, f) }, "–");
     const n = S.emps.filter(e => trabaja(e.id, f)).length;

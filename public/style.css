@@ -129,3 +129,7 @@ input{background:var(--card);color:var(--txt)}
 .cal tr.fsel td.libre{background:repeating-linear-gradient(45deg,var(--selA),var(--selA) 4px,var(--selB) 4px,var(--selB) 8px)}
 .cal tr.fsel .nom{background:var(--azul2);color:#fff}
 .cal tr.fsel .nom::before{content:""}
+
+/* ---- fila del tercio encima de "Trabajan" ---- */
+.cal tfoot tr:first-child th,.cal tfoot tr:first-child td{bottom:39px;border-top:2px solid var(--borde)}
+.cal tfoot tr:last-child th,.cal tfoot tr:last-child td{border-top:1px solid var(--linea)}
