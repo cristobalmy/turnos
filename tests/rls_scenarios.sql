@@ -1,0 +1,54 @@
+\set ON_ERROR_STOP on
+create or replace function pg_temp.chk(c boolean, msg text) returns void language plpgsql as
+$$ begin if c then raise notice 'OK   %', msg; else raise notice 'FALLO %', msg; end if; end $$;
+-- intenta ejecutar sql; devuelve true si da error (permiso denegado / política)
+create or replace function pg_temp.falla(s text) returns boolean language plpgsql as
+$$ begin execute s; return false; exception when others then return true; end $$;
+create or replace function pg_temp.filas(s text) returns integer language plpgsql as
+$$ declare n integer; begin execute s; get diagnostics n = row_count; return n; end $$;
+grant execute on function pg_temp.chk(boolean,text), pg_temp.falla(text), pg_temp.filas(text) to public;
+
+\echo == Importación
+select pg_temp.chk((select count(*) from asignaciones) = 989, 'las 989 asignaciones del Excel están importadas');
+select pg_temp.chk((select count(*) from dias) = 365, '365 días con su turno');
+select pg_temp.chk((select count(*) from cambios) = 0, 'la importación no ensucia el historial');
+
+\echo == Sin sesión / email desconocido
+begin; set local role anon;
+select pg_temp.chk(pg_temp.falla('select * from empleados'), 'sin iniciar sesión no se puede leer nada');
+rollback;
+
+begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"intruso@x.es"}',true);
+select pg_temp.chk((select count(*) from asignaciones) = 0, 'una cuenta que no está en empleados ve 0 asignaciones');
+select pg_temp.chk(pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values (4,'2026-11-01','AP')$$), 'y tampoco puede escribir');
+rollback;
+
+\echo == Agente (Gustavo, id 4)
+begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
+select pg_temp.chk((select count(*) from asignaciones) = 989, 've todo el calendario');
+select pg_temp.chk(not pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo,actualizado_por) values (4,'2026-11-01','V2',3)$$), 'puede poner un código en su propio día');
+select pg_temp.chk((select actualizado_por from asignaciones where empleado_id=4 and fecha='2026-11-01') = 4, 'no puede falsear quién hizo el cambio');
+select pg_temp.chk(pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values (3,'2026-11-01','V2')$$), 'NO puede poner un código a otra persona');
+select pg_temp.chk(pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values (4,'2026-11-02','PICO')$$), 'NO puede ponerse PICO');
+select pg_temp.chk(pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values (4,'2026-11-02','DESP')$$), 'NO puede ponerse DESP');
+select pg_temp.chk(pg_temp.filas($$update asignaciones set codigo='AP' where empleado_id=4 and codigo='PICO'$$) = 0, 'NO puede cambiar un PICO que le pusieron');
+select pg_temp.chk(pg_temp.filas($$delete from asignaciones where empleado_id=4 and codigo='PICO'$$) = 0, 'NO puede borrarse un PICO');
+select pg_temp.chk(pg_temp.filas($$update asignaciones set codigo='AP' where empleado_id=3$$) = 0, 'NO puede modificar días de otra persona');
+select pg_temp.chk(pg_temp.filas($$delete from asignaciones where empleado_id=3$$) = 0, 'NO puede borrar días de otra persona');
+select pg_temp.chk(pg_temp.falla($$update asignaciones set empleado_id=3 where empleado_id=4 and fecha='2026-11-01'$$), 'NO puede pasar su día a otra persona');
+select pg_temp.chk(pg_temp.filas($$update asignaciones set codigo='AP' where empleado_id=4 and fecha='2026-11-01'$$) = 1, 'puede cambiar un código suyo normal');
+select pg_temp.chk(pg_temp.filas($$delete from asignaciones where empleado_id=4 and fecha='2026-11-01'$$) = 1, 'puede quitar un código suyo normal');
+select pg_temp.chk(pg_temp.filas($$update empleados set rol='responsable' where nombre='Gustavo'$$) = 0, 'NO puede hacerse responsable');
+select pg_temp.chk(pg_temp.falla($$insert into codigos(codigo,descripcion,tipo,orden) values ('X','x','Especial',99)$$), 'NO puede crear códigos');
+select pg_temp.chk(pg_temp.filas($$update config set valor='1' where clave='minimo_operativo'$$) = 0, 'NO puede cambiar el mínimo operativo');
+select pg_temp.chk((select count(*) from cambios where hecho_por=4) = 3, 'sus 3 cambios quedan en el historial');
+rollback;
+
+\echo == Responsable (Nacho, id 3)
+begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"NACHO@t.es"}',true);
+select pg_temp.chk(not pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values (4,'2026-11-02','PICO')$$), 'puede poner PICO a otra persona (el email no distingue mayúsculas)');
+select pg_temp.chk(pg_temp.filas($$update asignaciones set codigo='AP' where empleado_id=4 and fecha='2026-11-02'$$) = 1, 'puede cambiar días de otra persona');
+select pg_temp.chk(pg_temp.filas($$delete from asignaciones where empleado_id=4 and fecha='2026-11-02'$$) = 1, 'puede borrar días de otra persona');
+select pg_temp.chk(pg_temp.filas($$update empleados set orden=orden where nombre='Gustavo'$$) = 1, 'puede gestionar empleados');
+select pg_temp.chk(pg_temp.filas($$update config set valor='6' where clave='minimo_operativo'$$) = 1, 'puede cambiar el mínimo operativo');
+rollback;
