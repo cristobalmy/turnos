@@ -38,7 +38,9 @@ function toast(msg, ms = 5000) {
   document.getElementById("toasts").append(t);
   setTimeout(() => t.remove(), ms);
 }
-const claseTipo = c => { const t = S.cods[c] && S.cods[c].tipo; return t === "Ausencia Justificada" ? "t-Ausencia" : t === "Tipo trabajo" ? "t-Trabajo" : "t-Especial"; };
+// Grupo visual de un código: los que solo ponen los responsables (PICO, DESP) son "modificadores".
+const grupoDe = c => { const x = S.cods[c]; if (!x) return "e"; if (x.solo_responsables) return "m"; return x.tipo === "Ausencia Justificada" ? "a" : x.tipo === "Tipo trabajo" ? "t" : "e"; };
+const claseTipo = c => ({ a: "t-Ausencia", t: "t-Trabajo", m: "t-Mod", e: "t-Especial" })[grupoDe(c)];
 
 // ---------- acceso ----------
 function pantallaLogin(msg) {
@@ -230,11 +232,11 @@ function vistaCalendario() {
     h("div", { class: "resumen" }, resumenDia()),
     h("div", { style: "height:.7rem" }),
     h("div", { class: "wrap" }, h("table", { class: "cal" + (S.fsel ? " conSel" : "") }, thead, tbody, tfoot)),
-    h("div", { class: "leyenda" }, h("span", { class: "a" }, "Vacaciones y permisos"), h("span", { class: "t" }, "Trabajo"), h("span", { class: "e" }, "Otros"), h("span", { class: "l" }, "Día libre (L)"),
+    h("div", { class: "leyenda" }, h("span", { class: "a" }, "Vacaciones y permisos"), h("span", { class: "t" }, "Trabajo"), h("span", { class: "m" }, "Modificadores (PICO, DESP)"), h("span", { class: "e" }, "Otros"), h("span", { class: "l" }, "Día libre (L)"),
       h("span", {}, (esResp() ? "Toca una casilla para poner o quitar un código. " : "Toca una casilla tuya para poner o quitar un código. ") + "Toca un nombre para resaltar su fila y un día arriba para ver su resumen.")));
 }
 
-const GRUPOS = [["Ausencia Justificada", "Vacaciones y permisos"], ["Tipo trabajo", "Trabajo"], ["Especial", "Otros"]];
+const GRUPOS = [["a", "Vacaciones y permisos"], ["t", "Trabajo"], ["m", "Modificadores"], ["e", "Otros"]];
 function abrirEdicion(emp, f) {
   const puede = esResp() || emp.id === S.me.id;
   const actual = S.asig[emp.id + "|" + f] || "";
@@ -245,7 +247,7 @@ function abrirEdicion(emp, f) {
   const [y, m, d] = f.split("-").map(Number);
   const elegir = async (codigo, btn) => { btn.disabled = true; await guardar(emp, f, codigo); dlg.close(); };
   const secciones = GRUPOS.map(([tipo, titulo]) => {
-    const lista = Object.values(S.cods).filter(c => c.tipo === tipo && (esResp() || !c.solo_responsables) && !(c.codigo === "PICO" && emp.hace_pico === false));
+    const lista = Object.values(S.cods).filter(c => grupoDe(c.codigo) === tipo && (esResp() || !c.solo_responsables) && !(c.codigo === "PICO" && emp.hace_pico === false));
     if (!lista.length) return null;
     return [h("h4", {}, titulo), h("div", { class: "chips" }, lista.map(c =>
       h("button", { class: `chip ${claseTipo(c.codigo)} ${c.codigo === actual ? "act" : ""}`, onclick: ev => elegir(c.codigo, ev.currentTarget) },

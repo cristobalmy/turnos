@@ -1,5 +1,5 @@
 :root{--cab:#0f2a4a;--fondo:#f6f8fb;--card:#fff;--linea:#eceff3;--hov:var(--hov);--finde:#f7f9fc;--rayaA:#f4f6f9;--rayaB:#e9edf2;--selA:#e3eefb;--selB:#d3e3f7;--bajo:#fbd5d0;--azul:#0f2a4a;--azul2:#2f7bd8;--azul-claro:#e8f1fd;--gris:#eef1f5;--borde:#dde2e9;--txt:#1b2733;--suave:#6a7684;--rojo:#c0392b;--verde:#1e8e4e;
- --aus:#ffe3a3;--aus-t:#7a5200;--trab:#c3e8cd;--trab-t:#145a32;--esp:#e6d3f3;--esp-t:#5b2a7d}
+ --aus:#cfe3fb;--aus-t:#0c3b7a;--trab:#123a6b;--trab-t:#fff;--mod:#111;--mod-t:#fff;--esp:#f8d4d0;--esp-t:#8a1c12}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%}
 body{font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--txt);background:var(--fondo)}
@@ -69,7 +69,7 @@ table.cal{border-collapse:separate;border-spacing:0;font-size:.82rem;width:100%}
 .cal tr.yo .nom{color:var(--azul2);background:var(--hov)}
 .cal tr.yo .nom::before{content:"●";font-size:.6rem;margin-right:.3rem}
 .cod{display:inline-block;border-radius:6px;padding:2px 5px;font-size:.74rem;font-weight:800;min-width:26px}
-.t-Ausencia{background:var(--aus);color:var(--aus-t)}.t-Trabajo{background:var(--trab);color:var(--trab-t)}.t-Especial{background:var(--esp);color:var(--esp-t)}
+.t-Ausencia{background:var(--aus);color:var(--aus-t)}.t-Trabajo{background:var(--trab);color:var(--trab-t)}.t-Mod{background:var(--mod);color:var(--mod-t);box-shadow:inset 0 0 0 1px #6b7690}.t-Especial{background:var(--esp);color:var(--esp-t)}
 .tur{font-weight:800;color:var(--azul)}
 .tur.L{color:#9aa4b1;font-weight:700}
 .cal tr.turno .nom,.cal tfoot .nom{color:var(--suave);font-weight:600}
@@ -79,7 +79,7 @@ table.cal{border-collapse:separate;border-spacing:0;font-size:.82rem;width:100%}
 .cal tfoot td.ok{color:var(--verde)}
 .leyenda{max-width:1400px;margin:.6rem auto;padding:0 .9rem;color:var(--suave);font-size:.8rem;display:flex;gap:.8rem;flex-wrap:wrap}
 .leyenda span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
-.leyenda .a::before{background:var(--aus)}.leyenda .t::before{background:var(--trab)}.leyenda .e::before{background:var(--esp)}
+.leyenda .a::before{background:var(--aus)}.leyenda .t::before{background:var(--trab)}.leyenda .m::before{background:var(--mod);box-shadow:inset 0 0 0 1px #6b7690}.leyenda .e::before{background:var(--esp)}
 .leyenda .l::before{background:repeating-linear-gradient(45deg,var(--rayaA),var(--rayaA) 2px,var(--suave) 2px,var(--suave) 4px)}
 /* ---- diálogo de edición ---- */
 dialog{border:0;border-radius:16px;padding:1rem 1rem .8rem;max-width:430px;width:94vw;max-height:90vh;box-shadow:0 10px 50px #0007}
@@ -91,7 +91,7 @@ dialog h4{margin:.8rem 0 .35rem;font-size:.75rem;text-transform:uppercase;letter
 .chip{display:flex;flex-direction:column;align-items:flex-start;text-align:left;border:2px solid transparent;border-radius:10px;padding:.4rem .55rem;cursor:pointer;min-height:48px;overflow:hidden}
 .chip b{font-size:.9rem}
 .chip span{font-size:.72rem;opacity:.85;line-height:1.15;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.chip.t-Ausencia{background:var(--aus);color:var(--aus-t)}.chip.t-Trabajo{background:var(--trab);color:var(--trab-t)}.chip.t-Especial{background:var(--esp);color:var(--esp-t)}
+.chip.t-Ausencia{background:var(--aus);color:var(--aus-t)}.chip.t-Trabajo{background:var(--trab);color:var(--trab-t)}.chip.t-Mod{background:var(--mod);color:var(--mod-t)}.chip.t-Especial{background:var(--esp);color:var(--esp-t)}
 .chip.act{border-color:var(--azul)}
 .chip:disabled{opacity:.6}
 .cand{font-size:.85rem;background:var(--azul-claro);border-radius:10px;padding:.5rem .6rem;margin:.6rem 0 0}
@@ -113,7 +113,7 @@ dialog .contenido:focus{outline:none}
 /* ---- modo oscuro ---- */
 :root[data-tema=oscuro]{color-scheme:dark;--cab:#0a1424;--fondo:#0d1420;--card:#151f30;--linea:#1f2b40;--hov:#1b2943;--finde:#121b2b;--rayaA:#111a29;--rayaB:#192437;--selA:#1a2c4a;--selB:#223a5f;--bajo:#4d2323;
  --azul:#a9c8f5;--azul2:#4a90e2;--azul-claro:#1b2c47;--gris:#222e45;--borde:#2a374e;--txt:#e6ebf5;--suave:#8d9ab3;--rojo:#ff7b6b;--verde:#4fd08a;
- --aus:#5c4510;--aus-t:#ffdc8f;--trab:#1f4d38;--trab-t:#a2e8c0;--esp:#43305f;--esp-t:#dcc2f7}
+ --aus:#24446f;--aus-t:#c4dcff;--trab:#2559a3;--trab-t:#fff;--mod:#04070c;--mod-t:#fff;--esp:#5a2321;--esp-t:#ffbdb5}
 dialog{background:var(--card);color:var(--txt)}
 input{background:var(--card);color:var(--txt)}
 .cal td.libre{background:repeating-linear-gradient(45deg,var(--rayaA),var(--rayaA) 4px,var(--rayaB) 4px,var(--rayaB) 8px)}
