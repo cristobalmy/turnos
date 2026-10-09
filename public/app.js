@@ -8,6 +8,14 @@ const S = { me: null, emps: [], cods: {}, minimo: 6, y: 0, m: 0, dias: {}, asig:
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DSEM = ["D","L","M","X","J","V","S"];
 
+// ---------- tema (claro / oscuro / automático) ----------
+const miTema = () => { try { return localStorage.getItem("tema") || "auto"; } catch (e) { return "auto"; } };
+function aplicarTema() {
+  const p = miTema(), osc = p === "oscuro" || (p === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.dataset.tema = osc ? "oscuro" : "claro";
+}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", aplicarTema);
+
 // ---------- utilidades ----------
 function h(tag, attrs, ...kids) {
   const e = document.createElement(tag);
@@ -271,6 +279,9 @@ function vistaCuenta() {
   const msg = h("div", { class: "error" });
   return h("div", { class: "pag" },
     h("h2", {}, S.me.nombre), h("p", {}, (S.me.rol === "responsable" ? "Responsable" : "Agente") + " · " + S.me.email),
+    h("h3", {}, "Apariencia"),
+    h("div", { class: "opciones" }, [["auto", "Automático"], ["claro", "Claro"], ["oscuro", "Oscuro"]].map(([v, t]) =>
+      h("button", { class: "btn sec" + (miTema() === v ? " act" : ""), onclick: () => { try { localStorage.setItem("tema", v); } catch (e) {} aplicarTema(); pintar(); } }, t))),
     h("h3", {}, "Cambiar contraseña"), p1, p2,
     h("button", { class: "btn full", onclick: async () => {
       if (p1.value.length < 8) { msg.textContent = "Mínimo 8 caracteres."; return; }
