@@ -868,10 +868,12 @@ function bloqueCalendario() {
       h("input", { type: "text", readonly: true, value: url, onfocus: ev => ev.target.select() }),
       h("div", { class: "fila" },
         h("button", { class: "btn sec mini", onclick: async () => { try { await navigator.clipboard.writeText(url); msg.textContent = "Enlace copiado ✔"; } catch (e) { msg.textContent = "Mantén pulsado el enlace para copiarlo."; } } }, "Copiar"),
-        h("a", { class: "btn sec mini", href: url.replace(/^https:/, "webcal:") }, "Añadir al calendario del iPhone"),
+        h("a", { class: "btn sec mini", href: url.replace(/^https:/, "webcal:") }, "iPhone: añadir al calendario"),
+        h("a", { class: "btn sec mini", target: "_blank", rel: "noopener", href: "https://calendar.google.com/calendar/render?cid=" + encodeURIComponent(url.replace(/^https:/, "webcal:")) }, "Android: añadir a Google Calendar"),
         h("button", { class: "btn sec mini", onclick: async () => { if (!confirm("El enlace anterior dejará de funcionar. ¿Crear uno nuevo?")) return;
           const t = nuevoToken(); const { error } = await sb.from("calendario_tokens").upsert({ empleado_id: S.me.id, token: t }, { onConflict: "empleado_id" }); if (!error) dibujar(t); } }, "Cambiar enlace")),
-      msg, h("p", { class: "sub" }, "Es privado: quien lo tenga ve tus turnos. No lo compartas. En Android o Google Calendar: Otros calendarios → Desde URL."));
+      msg, h("p", { class: "sub" }, "Es privado: quien lo tenga ve tus turnos. No lo compartas."),
+      h("p", { class: "sub" }, "Android: si el botón no te lo añade, copia el enlace, abre calendar.google.com (desde el ordenador o con «Sitio de escritorio» en el navegador del móvil), entra en Otros calendarios → Desde URL y pégalo. Después aparece en la app Calendario de tu Android. Google lo actualiza solo, pero puede tardar hasta un día en reflejar los cambios."));
   };
   sb.from("calendario_tokens").select("token").eq("empleado_id", S.me.id).maybeSingle().then(({ data, error }) => {
     if (error) caja.replaceChildren(h("p", { class: "sub" }, "No disponible todavía."));
