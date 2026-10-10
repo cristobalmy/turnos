@@ -275,46 +275,38 @@ async function cargarResumen() {
 }
 const trabajaR = (id, f) => { const c = R.asig[id + "|" + f]; return !c || !!(S.cods[c] && S.cods[c].cuenta_como_trabajo); };
 
-function panelBloque(titulo, k, esActual) {
+function panelBloque(titulo, k, clase) {
   const fechas = bloqueFechas(k), hoy = hoyStr();
-  if (!S.rsel[k] || !fechas.includes(S.rsel[k])) S.rsel[k] = esActual ? (fechas.includes(hoy) ? hoy : fechas[5]) : fechas[0];
-  const sel = S.rsel[k];
   const tercioR = f => S.emps.filter(e => { const c = R.asig[e.id + "|" + f]; return c && S.cods[c] && S.cods[c].tipo === "Ausencia Justificada"; }).length;
-  const chips = fechas.map(f => {
-    const [y, m, d] = f.split("-").map(Number), t = R.dias[f] || "", n = S.emps.filter(e => trabajaR(e.id, f)).length;
-    return h("button", { class: "dchip" + (f === sel ? " on" : "") + (f === hoy ? " hoy" : ""), onclick: () => { S.rsel[k] = f; pintar(); } },
-      h("small", {}, DSEM[new Date(y, m - 1, d).getDay()] + " " + d + "/" + m),
-      h("span", { class: "tur " + tl(t) }, tl(t)),
-      h("b", { class: n < S.minimo ? "bajo" : "ok" }, n));
-  });
-  const [y, m, d] = sel.split("-").map(Number), t = R.dias[sel];
-  const n = S.emps.filter(e => trabajaR(e.id, sel)).length, tc = tercioR(sel);
-  const activos = S.emps.filter(e => trabajaR(e.id, sel)).map(e => { const c = R.asig[e.id + "|" + sel]; return h("li", {}, e.nombre, c ? h("span", { class: "cod " + claseTipo(c) }, c) : null); });
-  const aus = S.emps.filter(e => !trabajaR(e.id, sel)).map(e => { const c = R.asig[e.id + "|" + sel]; return h("li", {}, e.nombre, h("span", { class: "cod " + claseTipo(c) }, c)); });
-  let pico = null;
-  if (sel >= hoy) {
-    const ya = S.emps.filter(e => R.asig[e.id + "|" + sel] === "PICO").map(e => e.nombre);
-    const r = recomendarPico(sel, R.asig);
-    pico = h("div", { class: "rpico" }, h("b", {}, "Pico: "), ya.length ? "ya asignado a " + ya.join(", ") : r.length ? [h("b", {}, r[0].e.nombre), r.length > 1 ? h("small", {}, " · luego " + r.slice(1).map(x => x.e.nombre).join(", ")) : null] : "nadie candidato");
-  }
-  return h("section", { class: "bloque" },
+  const fila = (etq, cls, celda) => h("tr", { class: cls }, h("th", {}, etq), fechas.map(f => celda(f)));
+  const persona = (e, f) => { const c = R.asig[e.id + "|" + f]; return h("li", {}, h("span", { class: "pn" }, e.nombre), c ? h("span", { class: "cod " + claseTipo(c) }, c) : null); };
+  const tabla = h("table", { class: "res" },
+    h("thead", {}, h("tr", {}, h("th", {}, ""), fechas.map(f => {
+      const [y, m, d] = f.split("-").map(Number);
+      return h("th", { class: f === hoy ? "hoy" : "" }, h("small", {}, DSEM[new Date(y, m - 1, d).getDay()]), `${d}/${m}`);
+    }))),
+    h("tbody", {},
+      fila("Turno", "rt", f => h("td", {}, h("span", { class: "tur " + tl(R.dias[f]) }, tl(R.dias[f])))),
+      fila("Trabajan", "rn", f => { const n = S.emps.filter(e => trabajaR(e.id, f)).length; return h("td", { class: n < S.minimo ? "bajo" : "ok" }, n); }),
+      fila("Tercio", "rn", f => { const n = tercioR(f); return h("td", { class: n > S.tercio ? "bajo" : "ok" }, n); }),
+      fila("Pico", "rp", f => {
+        if (f < hoy) return h("td", {}, "–");
+        const ya = S.emps.filter(e => R.asig[e.id + "|" + f] === "PICO").map(e => e.nombre);
+        if (ya.length) return h("td", {}, h("small", {}, "asignado"), h("div", {}, ya.join(", ")));
+        const r = recomendarPico(f, R.asig);
+        return h("td", {}, r.length ? [h("small", {}, "recomendado"), h("div", {}, h("b", {}, r[0].e.nombre))] : h("small", {}, "nadie"));
+      }),
+      fila("Personal activo", "rl", f => h("td", {}, h("ul", {}, S.emps.filter(e => trabajaR(e.id, f)).map(e => persona(e, f))))),
+      fila("Ausencias", "rl", f => h("td", {}, h("ul", {}, S.emps.filter(e => !trabajaR(e.id, f)).map(e => persona(e, f)))))));
+  return h("section", { class: "bloque " + clase },
     h("h3", {}, titulo, h("small", {}, ` · ${fechaCorta(fechas[0])} – ${fechaCorta(fechas[5])}`)),
-    h("div", { class: "dchips" }, chips),
-    h("div", { class: "dtit" }, `${DLARGO[new Date(y, m - 1, d).getDay()]} ${d}/${m}`, h("span", { class: "pill" }, "Turno " + (TURNO_NOMBRE[t] || "?").toLowerCase())),
-    h("div", { class: "dnum" },
-      h("div", {}, h("span", { class: "grande " + (n < S.minimo ? "bajo" : "ok") }, `${n}/${S.emps.length}`), h("small", {}, ` trabajan (mín. ${S.minimo})`)),
-      h("div", {}, h("span", { class: "grande " + (tc > S.tercio ? "bajo" : "ok") }, `${tc}/${S.tercio}`), h("small", {}, " tercio"))),
-    pico,
-    h("div", { class: "dcols" },
-      h("div", {}, h("h4", {}, "Personal activo"), h("ul", {}, activos)),
-      h("div", {}, h("h4", {}, "Ausencias"), aus.length ? h("ul", {}, aus) : h("p", { class: "det" }, "Nadie"))));
+    h("div", { class: "wrapres" }, tabla));
 }
 function vistaResumen() {
   const k = bloqueActual(), hoy = hoyStr(), fs = bloqueFechas(k);
-  const enServicio = fs.includes(hoy);
-  return h("div", { class: "pag resumenPag" },
-    panelBloque(enServicio ? "Turno actual" : "Turno que acaba de pasar", k, true),
-    panelBloque("Turno siguiente", k + 1, false));
+  return h("div", { class: "resumenPag" },
+    panelBloque(fs.includes(hoy) ? "Turno actual" : "Turno que acaba de pasar", k, "actual"),
+    panelBloque("Turno siguiente", k + 1, "siguiente"));
 }
 
 function bloquePico() {

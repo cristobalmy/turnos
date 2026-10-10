@@ -186,7 +186,7 @@ dialog input:disabled{opacity:.45}
 .enlace:disabled{opacity:.5}
 
 /* resumen diario */
-.resumenPag{max-width:900px;margin:0 auto;padding:.8rem;display:grid;gap:.9rem}
+.resumenPag{max-width:1500px;margin:0 auto;padding:.8rem;display:grid;gap:.9rem;grid-template-columns:minmax(0,1fr)}
 .bloque{background:var(--card);border:1px solid var(--borde);border-radius:12px;padding:.8rem .9rem}
 .bloque h3{margin:0 0 .6rem;font-size:1.05rem}.bloque h3 small{color:var(--suave);font-weight:400}
 .dchips{display:grid;grid-template-columns:repeat(6,1fr);gap:.35rem}
@@ -204,3 +204,23 @@ dialog input:disabled{opacity:.45}
 .dcols h4{margin:.2rem 0 .3rem;font-size:.85rem;color:var(--suave);text-transform:uppercase;letter-spacing:.03em}
 .dcols ul{list-style:none;margin:0;padding:0}.dcols li{display:flex;gap:.5rem;align-items:center;padding:.15rem 0}
 @media(max-width:700px){.dcols ul{columns:1}}
+
+.bloque.siguiente{background:color-mix(in srgb,var(--card) 92%,#e0463a)}
+.wrapres{overflow-x:auto}
+table.res{border-collapse:collapse;width:100%;table-layout:fixed;min-width:calc(5.4rem + 6 * 7.8rem)}
+table.res th,table.res td{border:1px solid var(--borde);padding:.3rem .4rem;vertical-align:top;text-align:center}
+table.res thead th{background:var(--azul-claro);font-size:.85rem}
+table.res thead th small{display:block;color:var(--suave);font-weight:400}
+table.res thead th.hoy{background:#2563b8;color:#fff}table.res thead th.hoy small{color:#dbe8ff}
+table.res tbody th{width:5.2rem;font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;color:var(--suave);text-align:left;background:var(--fondo)}
+table.res .rn td{font-weight:800;font-size:1.05rem}
+table.res td.ok{color:var(--verde)}table.res td.bajo{color:var(--rojo);background:var(--bajo)}
+table.res .rp td{font-size:.8rem}table.res .rp small{display:block;color:var(--suave);font-size:.68rem}
+table.res .rl td{text-align:left;padding:.3rem .35rem}
+table.res ul{list-style:none;margin:0;padding:0}
+table.res li{display:grid;grid-template-columns:minmax(0,1fr) 3.1em;align-items:center;gap:.3rem;padding:.12rem 0;font-size:.85rem}
+table.res li .pn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.res li .cod{text-align:center;padding:2px 0;min-width:0}
+
+table.res tbody th,table.res thead th:first-child{position:sticky;left:0;z-index:1}
+table.res tbody th{width:5.4rem}
