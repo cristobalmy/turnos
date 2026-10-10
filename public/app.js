@@ -310,25 +310,29 @@ function editarFormacion(emp, item) {
   const fuera = item && !cursos.some(c => c.nombre === item.nombre);   // registro antiguo que no está en la lista
   const nombre = h("select", {}, !item ? h("option", { value: "" }, "— Elige —") : null,
     fuera ? h("option", { value: item.nombre, selected: true }, item.nombre + " (ya no está en la lista)") : null,
-    grupo("Habilitaciones", "Habilitación"), grupo("Formaciones", "Formación"));
+    grupo("Habilitaciones", "Habilitación"), grupo("Formaciones", "Formación"), grupo("Material de dotación", "Material"));
   const fecha = h("input", { type: "date", value: item && item.fecha ? item.fecha : hoyStr() });
   const sinFecha = h("input", { type: "checkbox", checked: !!item && !item.fecha });
   const sync = () => { fecha.disabled = sinFecha.checked; };
   sinFecha.addEventListener("change", sync); sync();
+  const bloqueFecha = h("div", {}, h("label", {}, "Fecha en que se hizo", fecha), h("label", { class: "check" }, sinFecha, " No recuerdo la fecha"));
+  const ajustar = () => { bloqueFecha.style.display = tipoDe(nombre.value) === "Material" ? "none" : ""; };
+  nombre.addEventListener("change", ajustar);
   const err = h("div", { class: "error" });
   const guardarF = async ev => {
     const n = nombre.value;
     if (!n) { err.textContent = "Elige el curso."; return; }
-    if (!sinFecha.checked && !fecha.value) { err.textContent = "Indica la fecha o marca «No recuerdo la fecha»."; return; }
+    const material = tipoDe(n) === "Material";
+    if (!material && !sinFecha.checked && !fecha.value) { err.textContent = "Indica la fecha o marca «No recuerdo la fecha»."; return; }
     ev.target.disabled = true;
-    const fila = { empleado_id: emp.id, nombre: n, fecha: sinFecha.checked ? null : fecha.value };
+    const fila = { empleado_id: emp.id, nombre: n, fecha: material || sinFecha.checked ? null : fecha.value };
     const { error } = item ? await sb.from("formaciones").update(fila).eq("id", item.id) : await sb.from("formaciones").insert(fila);
     if (error) { ev.target.disabled = false; err.textContent = "No se pudo guardar: " + error.message; return; }
     await cargarForms(); dlg.close();
   };
   dlg.append(
     h("h3", {}, item ? "Editar" : "Añadir"), h("p", { class: "sub" }, emp.nombre),
-    h("label", {}, "Curso o habilitación", nombre), h("label", {}, "Fecha en que se hizo", fecha), h("label", { class: "check" }, sinFecha, " No recuerdo la fecha"), err,
+    h("label", {}, "Curso o habilitación", nombre), bloqueFecha, err,
     h("div", { class: "fila" },
       item ? h("button", { class: "btn sec", onclick: async ev => {
         if (!confirm("¿Borrar «" + item.nombre + "»?")) return;
@@ -339,6 +343,7 @@ function editarFormacion(emp, item) {
       } }, "Borrar") : h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cancelar"),
       h("button", { class: "btn", onclick: guardarF }, "Guardar")));
   dlg.addEventListener("close", () => { dlg.remove(); pintar(); });
+  ajustar();
   document.body.append(dlg); dlg.showModal(); nombre.focus();
 }
 
@@ -362,8 +367,8 @@ function vistaFormacion() {
           h("span", { class: "chev" }, "›"), h("b", {}, e.id === S.me.id ? e.nombre + " (tú)" : e.nombre), h("span", { class: "fn" }, String(todas.length)),
           puede ? h("button", { class: "btn mini", onclick: ev => { ev.stopPropagation(); editarFormacion(e, null); } }, "+ Añadir") : null),
         !abierta ? null : items.length ? items.map(f => h("div", { class: "fila-f" + (puede ? " edit" : ""), onclick: puede ? () => editarFormacion(e, f) : null },
-          h("span", { class: "ftipo " + (tipoDe(f.nombre) === "Habilitación" ? "hab" : "for") }, tipoDe(f.nombre)),
-          h("span", { class: "fnom" }, f.nombre), h("span", { class: "ffecha" }, fechaLarga(f.fecha))))
+          h("span", { class: "ftipo " + ({ "Habilitación": "hab", "Material": "mat" }[tipoDe(f.nombre)] || "for") }, tipoDe(f.nombre)),
+          h("span", { class: "fnom" }, f.nombre), h("span", { class: "ffecha" }, tipoDe(f.nombre) === "Material" ? "" : fechaLarga(f.fecha))))
           : h("div", { class: "vacio" }, e.id === S.me.id ? "Aún no has añadido ninguna. Pulsa «+ Añadir»." : "Sin registros"));
     }).filter(Boolean);
     lista.replaceChildren(...(bloques.length ? bloques : [h("div", { class: "vacio" }, "Nada coincide con la búsqueda.")]));

@@ -69,14 +69,16 @@ select pg_temp.chk((select count(*) from net.llamadas) = 0, 'un cambio desde el 
 rollback;
 
 \echo == Cursos y habilitaciones (lista cerrada)
-select pg_temp.chk((select count(*) from cursos) = 11 and (select count(*) from cursos where tipo='Habilitación') = 3, 'la lista tiene 11 cursos, 3 de ellos habilitaciones');
+select pg_temp.chk((select count(*) from cursos) = 14 and (select count(*) from cursos where tipo='Habilitación') = 3 and (select count(*) from cursos where tipo='Material') = 3, 'la lista tiene 3 habilitaciones, 8 formaciones y 3 materiales');
 begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
 select pg_temp.chk(not pg_temp.falla($$insert into formaciones(empleado_id,nombre,fecha) values (4,'Intervención vehículos','2026-03-02')$$), 'puede apuntar un curso de la lista (con tildes)');
 select pg_temp.chk((select nombre from formaciones where empleado_id=4) = 'Intervención vehículos', 'las tildes se guardan tal cual');
 select pg_temp.chk(not pg_temp.falla($$insert into formaciones(empleado_id,nombre,fecha) values (4,'TAU 2',null)$$), 'se puede apuntar sin fecha (no recuerdo la fecha)');
+select pg_temp.chk(not pg_temp.falla($$insert into formaciones(empleado_id,nombre,fecha) values (4,'Chaleco interior','2026-05-05')$$), 'puede apuntar material de dotación');
+select pg_temp.chk((select fecha is null from formaciones where nombre='Chaleco interior'), 'el material se guarda siempre sin fecha');
 select pg_temp.chk(pg_temp.falla($$insert into formaciones(empleado_id,nombre,fecha) values (4,'Curso inventado','2026-03-02')$$), 'NO puede apuntar un curso que no está en la lista');
 select pg_temp.chk(pg_temp.falla($$insert into formaciones(empleado_id,nombre,fecha) values (3,'TAIP','2026-03-02')$$), 'NO puede apuntar uno a otra persona');
-select pg_temp.chk(pg_temp.filas($$update formaciones set fecha='2026-03-03' where empleado_id=4$$) = 2, 'puede corregir la fecha de la suya');
+select pg_temp.chk(pg_temp.filas($$update formaciones set fecha='2026-03-03' where empleado_id=4$$) = 3, 'puede corregir la fecha de la suya');
 select pg_temp.chk(pg_temp.falla($$update formaciones set empleado_id=3 where empleado_id=4$$), 'NO puede pasarla a otra persona');
 select pg_temp.chk(pg_temp.falla($$insert into cursos(nombre,tipo,orden) values ('Nuevo','Formación',99)$$), 'un agente NO puede cambiar la lista de cursos');
 rollback;
