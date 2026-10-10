@@ -223,3 +223,14 @@ table.res li .cod{text-align:center;padding:2px 0;min-width:0}
 
 table.res tbody th,table.res thead th:first-child{position:sticky;left:0;z-index:1}
 table.res tbody th{width:4.6rem}
+
+/* informes */
+.pag.ancho{max-width:640px}
+.pag select{width:100%;padding:.55rem;margin:.3rem 0 .6rem;border:1px solid var(--borde);border-radius:10px;background:var(--card);color:inherit;font-size:1rem}
+.itot{display:flex;gap:1.6rem;margin:.4rem 0 .6rem}.itot div{display:flex;flex-direction:column}.itot b{font-size:1.7rem}.itot small{color:var(--suave)}
+.icod{border-top:1px solid var(--linea)}.icod summary{display:grid;grid-template-columns:3.4em 1fr auto;gap:.5rem;align-items:center;padding:.4rem 0;cursor:pointer;list-style:none}
+.icod summary::-webkit-details-marker{display:none}.icod .cod{text-align:center}.idesc{color:var(--suave);font-size:.85rem}
+.ifechas{padding:0 0 .6rem 3.9em;color:var(--suave);font-size:.85rem;line-height:1.5}
+table.ipicos{width:100%;border-collapse:collapse}.ipicos th,.ipicos td{padding:.4rem .3rem;border-bottom:1px solid var(--linea);text-align:center}
+.ipicos td:first-child,.ipicos th:first-child{text-align:left}.ipicos th{font-size:.78rem;color:var(--suave);text-transform:uppercase}
+table.res .rq td{font-size:.78rem;background:var(--bajo)}table.res .rq small{display:block;color:var(--suave);font-size:.68rem}
