@@ -95,6 +95,33 @@ select pg_temp.chk(pg_temp.filas($$update formaciones set nombre='TAU 1' where e
 select pg_temp.chk(not pg_temp.falla($$insert into cursos(nombre,tipo,orden) values ('Nuevo','Formación',99)$$), 'un responsable puede ampliar la lista');
 rollback;
 
+\echo == Días pasados
+begin;
+insert into asignaciones(empleado_id,fecha,codigo) values (4,(now() at time zone 'Europe/Madrid')::date - 3,'V1');
+insert into asignaciones(empleado_id,fecha,codigo) values (3,(now() at time zone 'Europe/Madrid')::date - 3,'V1');
+set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
+select pg_temp.chk(pg_temp.falla(format($f$insert into asignaciones(empleado_id,fecha,codigo) values (4,%L,'AP')$f$, (now() at time zone 'Europe/Madrid')::date - 1)), 'un agente NO puede apuntar un día pasado');
+select pg_temp.chk(pg_temp.falla(format($f$update asignaciones set codigo='AP' where empleado_id=4 and fecha=%L$f$, (now() at time zone 'Europe/Madrid')::date - 3)), 'un agente NO puede cambiar un día pasado');
+select pg_temp.chk(pg_temp.falla(format($f$delete from asignaciones where empleado_id=4 and fecha=%L$f$, (now() at time zone 'Europe/Madrid')::date - 3)), 'un agente NO puede borrar un día pasado');
+select pg_temp.chk(pg_temp.falla(format($f$update asignaciones set fecha=%L where empleado_id=4 and fecha=%L$f$, (now() at time zone 'Europe/Madrid')::date - 5, (now() at time zone 'Europe/Madrid')::date - 3)), 'ni mover un día pasado a otra fecha pasada');
+select pg_temp.chk(not pg_temp.falla(format($f$insert into asignaciones(empleado_id,fecha,codigo) values (4,%L,'AP')$f$, (now() at time zone 'Europe/Madrid')::date)), 'sí puede apuntar HOY');
+select pg_temp.chk(not pg_temp.falla(format($f$insert into asignaciones(empleado_id,fecha,codigo) values (4,%L,'AP')$f$, (now() at time zone 'Europe/Madrid')::date + 7)), 'y días futuros');
+select pg_temp.chk(pg_temp.falla(format($f$update asignaciones set fecha=%L where empleado_id=4 and codigo='AP' and fecha=%L$f$, (now() at time zone 'Europe/Madrid')::date - 2, (now() at time zone 'Europe/Madrid')::date + 7)), 'NO puede llevar un día futuro al pasado');
+rollback;
+begin;
+insert into asignaciones(empleado_id,fecha,codigo) values (4,(now() at time zone 'Europe/Madrid')::date - 3,'V1');
+set local role authenticated; select set_config('request.jwt.claims','{"email":"nacho@t.es"}',true);
+select pg_temp.chk(pg_temp.falla(format($f$update asignaciones set codigo='AP' where empleado_id=4 and fecha=%L$f$, (now() at time zone 'Europe/Madrid')::date - 3)), 'un responsable (no administrador) tampoco puede cambiar días pasados');
+select pg_temp.chk(pg_temp.falla($$update empleados set admin = true where nombre='Nacho'$$), 'un responsable NO puede nombrarse administrador');
+select pg_temp.chk(not pg_temp.falla(format($f$insert into asignaciones(empleado_id,fecha,codigo) values (4,%L,'PICO')$f$, (now() at time zone 'Europe/Madrid')::date + 2)), 'pero sí gestiona días futuros');
+rollback;
+begin;
+insert into asignaciones(empleado_id,fecha,codigo) values (4,(now() at time zone 'Europe/Madrid')::date - 3,'V1');
+set local role authenticated; select set_config('request.jwt.claims','{"email":"cristobal@t.es"}',true);
+select pg_temp.chk(not pg_temp.falla(format($f$update asignaciones set codigo='AP' where empleado_id=4 and fecha=%L$f$, (now() at time zone 'Europe/Madrid')::date - 3)), 'el administrador SÍ puede cambiar días pasados');
+select pg_temp.chk(not pg_temp.falla(format($f$delete from asignaciones where empleado_id=4 and fecha=%L$f$, (now() at time zone 'Europe/Madrid')::date - 3)), 'y borrarlos');
+rollback;
+
 \echo == Responsable (Nacho, id 3)
 begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"NACHO@t.es"}',true);
 select pg_temp.chk(not pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values (4,'2026-11-02','PICO')$$), 'puede poner PICO a otra persona (el email no distingue mayúsculas)');

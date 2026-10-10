@@ -212,7 +212,7 @@ function vistaCalendario() {
     h("th", { class: "nom", title: "Resaltar su fila", onclick: () => { S.fsel = S.fsel === e.id ? null : e.id; pintar(); } }, e.nombre),
     dias.map(d => {
       const f = fechaStr(S.y, S.m, d), c = S.asig[e.id + "|" + f], t = S.dias[f];
-      return h("td", { class: "dia " + cls(d, f) + (t === "S" || t === "L" ? " libre" : ""), onclick: () => { S.sel = f; abrirEdicion(e, f); } },
+      return h("td", { class: "dia " + cls(d, f) + (t === "S" || t === "L" ? " libre" : "") + (esPasado(f) && !S.me.admin ? " pasado" : ""), onclick: () => { S.sel = f; abrirEdicion(e, f); } },
         c ? h("span", { class: "cod " + claseTipo(c) }, c) : "");
     }))));
   const filaTercio = h("tr", {}, h("th", { class: "nom", title: "Ausentes por vacaciones o permisos" }, `Tercio (máx. ${S.tercio})`), dias.map(d => {
@@ -238,7 +238,21 @@ function vistaCalendario() {
 }
 
 const GRUPOS = [["a", "Vacaciones y permisos"], ["t", "Trabajo"], ["m", "Modificadores"], ["e", "Otros"]];
+const esPasado = f => f < hoyStr();
+function avisoDiaBloqueado(f) {
+  const adm = S.emps.find(e => e.admin);
+  const dlg = h("dialog", {});
+  dlg.append(h("h3", {}, "Día bloqueado"),
+    h("p", { class: "sub" }, fechaLarga(f)),
+    h("p", {}, "No se pueden modificar los días que ya han pasado."),
+    h("p", {}, "Si necesitas cambiar algo, ponte en contacto con el administrador" + (adm ? " (" + adm.nombre + ")" : "") + "."),
+    h("div", { class: "fila" }, h("button", { class: "btn", onclick: () => dlg.close() }, "Entendido")));
+  dlg.addEventListener("close", () => { dlg.remove(); pintar(); });
+  document.body.append(dlg); dlg.showModal();
+}
+
 function abrirEdicion(emp, f) {
+  if (esPasado(f) && !S.me.admin) { avisoDiaBloqueado(f); return; }
   const puede = esResp() || emp.id === S.me.id;
   const actual = S.asig[emp.id + "|" + f] || "";
   const bloqueado = !esResp() && actual && S.cods[actual] && S.cods[actual].solo_responsables;
@@ -272,7 +286,10 @@ async function guardar(emp, f, codigo) {
   let error;
   if (codigo) ({ error } = await sb.from("asignaciones").upsert({ empleado_id: emp.id, fecha: f, codigo }, { onConflict: "empleado_id,fecha" }));
   else ({ error } = await sb.from("asignaciones").delete().eq("empleado_id", emp.id).eq("fecha", f));
-  if (error) { toast("No se pudo guardar: " + error.message, 6000); return; }
+  if (error) {
+    if (/días pasados/.test(error.message)) { avisoDiaBloqueado(f); return; }
+    toast("No se pudo guardar: " + error.message, 6000); return;
+  }
   if (codigo) S.asig[k] = codigo; else delete S.asig[k];
   pintar();
 }

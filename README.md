@@ -26,6 +26,8 @@ Después, `supabase/migracion_005_fecha_opcional.sql` (permite "no recuerdo la f
 
 Por último, `supabase/migracion_006_material.sql` (material de dotación, sin fecha).
 
+Después, `supabase/migracion_007_dias_pasados.sql` (los días pasados quedan bloqueados salvo para el administrador, Cristobal).
+
 ## Avisos al móvil (opcional)
 1. Supabase → Edge Functions → *Deploy a new function* → *Via Editor*, nombre `avisar`, pegar `supabase/functions/avisar/index.ts`. Desactivar *Verify JWT*.
 2. Edge Functions → Secrets: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:tu@correo`) y `AVISO_SECRET`.
