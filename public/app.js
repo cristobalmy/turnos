@@ -291,14 +291,14 @@ function vistaHistorial() {
 }
 
 // ---------- formaciones y habilitaciones ----------
-const fechaLarga = f => { const [y, m, d] = f.split("-"); return `${d}/${m}/${y}`; };
+const fechaLarga = f => { if (!f) return "Sin fecha"; const [y, m, d] = f.split("-"); return `${d}/${m}/${y}`; };
 async function cargarCursos() {
   const { data, error } = await sb.from("cursos").select("*").order("orden");
   S.cursos = error ? [] : data;
 }
 const tipoDe = nombre => { const c = (S.cursos || []).find(x => x.nombre === nombre); return c ? c.tipo : "Formación"; };
 async function cargarForms() {
-  const { data, error } = await sb.from("formaciones").select("*").order("fecha", { ascending: false });
+  const { data, error } = await sb.from("formaciones").select("*").order("fecha", { ascending: false, nullsFirst: false });
   if (error) { toast("No se pudieron cargar las formaciones: " + error.message, 6000); return; }
   S.forms = data;
 }
@@ -311,21 +311,24 @@ function editarFormacion(emp, item) {
   const nombre = h("select", {}, !item ? h("option", { value: "" }, "— Elige —") : null,
     fuera ? h("option", { value: item.nombre, selected: true }, item.nombre + " (ya no está en la lista)") : null,
     grupo("Habilitaciones", "Habilitación"), grupo("Formaciones", "Formación"));
-  const fecha = h("input", { type: "date", value: item ? item.fecha : hoyStr() });
+  const fecha = h("input", { type: "date", value: item && item.fecha ? item.fecha : hoyStr() });
+  const sinFecha = h("input", { type: "checkbox", checked: !!item && !item.fecha });
+  const sync = () => { fecha.disabled = sinFecha.checked; };
+  sinFecha.addEventListener("change", sync); sync();
   const err = h("div", { class: "error" });
   const guardarF = async ev => {
     const n = nombre.value;
     if (!n) { err.textContent = "Elige el curso."; return; }
-    if (!fecha.value) { err.textContent = "Indica la fecha en que se hizo."; return; }
+    if (!sinFecha.checked && !fecha.value) { err.textContent = "Indica la fecha o marca «No recuerdo la fecha»."; return; }
     ev.target.disabled = true;
-    const fila = { empleado_id: emp.id, nombre: n, fecha: fecha.value };
+    const fila = { empleado_id: emp.id, nombre: n, fecha: sinFecha.checked ? null : fecha.value };
     const { error } = item ? await sb.from("formaciones").update(fila).eq("id", item.id) : await sb.from("formaciones").insert(fila);
     if (error) { ev.target.disabled = false; err.textContent = "No se pudo guardar: " + error.message; return; }
     await cargarForms(); dlg.close();
   };
   dlg.append(
     h("h3", {}, item ? "Editar" : "Añadir"), h("p", { class: "sub" }, emp.nombre),
-    h("label", {}, "Curso o habilitación", nombre), h("label", {}, "Fecha en que se hizo", fecha), err,
+    h("label", {}, "Curso o habilitación", nombre), h("label", {}, "Fecha en que se hizo", fecha), h("label", { class: "check" }, sinFecha, " No recuerdo la fecha"), err,
     h("div", { class: "fila" },
       item ? h("button", { class: "btn sec", onclick: async ev => {
         if (!confirm("¿Borrar «" + item.nombre + "»?")) return;
@@ -342,7 +345,7 @@ function editarFormacion(emp, item) {
 function vistaFormacion() {
   const cont = h("div", { class: "form-pag" });
   const lista = h("div", {});
-  const buscar = h("input", { type: "search", placeholder: "Buscar una formación o a una persona…", value: S.fq || "" });
+  const buscar = h("input", { type: "search", placeholder: "Buscar curso o persona…", value: S.fq || "" });
   const pintarLista = () => {
     const q = (buscar.value || "").trim().toLowerCase();
     S.fq = buscar.value;
@@ -353,18 +356,22 @@ function vistaFormacion() {
       const items = q && !coincideNombre ? todas.filter(f => f.nombre.toLowerCase().includes(q) || tipoDe(f.nombre).toLowerCase().includes(q)) : todas;
       if (q && !items.length) return null;
       const puede = esResp() || e.id === S.me.id;
-      return h("section", { class: "fpers" + (e.id === S.me.id ? " yo" : "") },
-        h("div", { class: "fcab" }, h("b", {}, e.id === S.me.id ? e.nombre + " (tú)" : e.nombre), h("span", { class: "fn" }, String(todas.length)),
-          puede ? h("button", { class: "btn mini", onclick: () => editarFormacion(e, null) }, "+ Añadir") : null),
-        items.length ? items.map(f => h("div", { class: "fila-f" + (puede ? " edit" : ""), onclick: puede ? () => editarFormacion(e, f) : null },
+      const abierta = !!q || S.abiertas.has(e.id);
+      return h("section", { class: "fpers" + (e.id === S.me.id ? " yo" : "") + (abierta ? " abierta" : "") },
+        h("div", { class: "fcab", role: "button", tabindex: "0", "aria-expanded": String(abierta), onclick: () => { if (q) return; if (S.abiertas.has(e.id)) S.abiertas.delete(e.id); else S.abiertas.add(e.id); pintarLista(); } },
+          h("span", { class: "chev" }, "›"), h("b", {}, e.id === S.me.id ? e.nombre + " (tú)" : e.nombre), h("span", { class: "fn" }, String(todas.length)),
+          puede ? h("button", { class: "btn mini", onclick: ev => { ev.stopPropagation(); editarFormacion(e, null); } }, "+ Añadir") : null),
+        !abierta ? null : items.length ? items.map(f => h("div", { class: "fila-f" + (puede ? " edit" : ""), onclick: puede ? () => editarFormacion(e, f) : null },
           h("span", { class: "ftipo " + (tipoDe(f.nombre) === "Habilitación" ? "hab" : "for") }, tipoDe(f.nombre)),
           h("span", { class: "fnom" }, f.nombre), h("span", { class: "ffecha" }, fechaLarga(f.fecha))))
           : h("div", { class: "vacio" }, e.id === S.me.id ? "Aún no has añadido ninguna. Pulsa «+ Añadir»." : "Sin registros"));
     }).filter(Boolean);
     lista.replaceChildren(...(bloques.length ? bloques : [h("div", { class: "vacio" }, "Nada coincide con la búsqueda.")]));
   };
+  if (!S.abiertas) S.abiertas = new Set([S.me.id]);
   buscar.addEventListener("input", pintarLista);
-  cont.append(h("h2", {}, "Formaciones y habilitaciones"), h("p", { class: "sub" }, esResp() ? "Cada uno puede editar las suyas; como responsable puedes editar las de todos." : "Puedes añadir, corregir o borrar las tuyas. Las de los compañeros son solo de lectura."), buscar, lista);
+  const todo = h("button", { class: "btn sec mini", onclick: () => { if (S.abiertas.size >= S.emps.length) S.abiertas = new Set(); else S.abiertas = new Set(S.emps.map(e => e.id)); pintarLista(); todo.textContent = S.abiertas.size >= S.emps.length ? "Plegar todo" : "Desplegar todo"; } }, "Desplegar todo");
+  cont.append(h("h2", {}, "Formaciones y habilitaciones"), h("p", { class: "sub" }, esResp() ? "Cada uno puede editar las suyas; como responsable puedes editar las de todos." : "Puedes añadir, corregir o borrar las tuyas. Las de los compañeros son solo de lectura."), h("div", { class: "fbarra" }, buscar, todo), lista);
   const cargar = () => Promise.all([cargarCursos(), cargarForms()]).then(pintarLista);
   if (S.forms && S.cursos) pintarLista(); else lista.append(h("div", { class: "vacio" }, "Cargando…"));
   cargar();

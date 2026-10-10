@@ -153,3 +153,13 @@ input{background:var(--card);color:var(--txt)}
 .vacio{color:var(--suave);padding:.5rem 0;font-size:.9rem}
 dialog label{display:block;font-size:.85rem;color:var(--suave);margin-top:.7rem}
 dialog label input,dialog label select{display:block;width:100%;margin-top:.25rem;padding:.6rem;border:1px solid var(--borde);border-radius:10px;background:var(--card);color:var(--txt)}
+
+/* ---- listas plegables y casilla de fecha ---- */
+.fbarra{display:flex;gap:.5rem;margin-bottom:.8rem}.fbarra input[type=search]{margin:0;flex:1}.fbarra .btn{white-space:nowrap}
+.fcab{cursor:pointer;user-select:none}
+.chev{display:inline-block;width:1rem;color:var(--suave);transition:transform .15s}
+.fpers.abierta .chev{transform:rotate(90deg)}
+.fpers:not(.abierta){padding-bottom:.3rem}
+dialog label.check{display:flex;align-items:center;gap:.5rem;color:var(--txt);margin-top:.5rem}
+dialog label.check input{width:auto;margin:0}
+dialog input:disabled{opacity:.45}

@@ -22,6 +22,8 @@ App web instalable (PWA) para el equipo. Supabase (base de datos + acceso) + Ver
 ## Formaciones y habilitaciones
 Ejecutar `supabase/migracion_004_cursos.sql` en el SQL Editor (lista cerrada de cursos, tabla de registros y permisos; sustituye a la 003).
 
+Después, `supabase/migracion_005_fecha_opcional.sql` (permite "no recuerdo la fecha").
+
 ## Avisos al móvil (opcional)
 1. Supabase → Edge Functions → *Deploy a new function* → *Via Editor*, nombre `avisar`, pegar `supabase/functions/avisar/index.ts`. Desactivar *Verify JWT*.
 2. Edge Functions → Secrets: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:tu@correo`) y `AVISO_SECRET`.
