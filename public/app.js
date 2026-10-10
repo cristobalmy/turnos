@@ -313,6 +313,11 @@ async function cargarCursos() {
   const { data, error } = await sb.from("cursos").select("*").order("orden");
   S.cursos = error ? [] : data;
 }
+// Orden: primero formaciones, luego habilitaciones y luego material; dentro de cada apartado, alfabético.
+const RANGO_TIPO = { "Formación": 0, "Habilitación": 1, "Material": 2 };
+const alfa = (x, y) => x.localeCompare(y, "es", { numeric: true, sensitivity: "base" });
+const cmpRegistros = (f, g) => (RANGO_TIPO[tipoDe(f.nombre)] ?? 0) - (RANGO_TIPO[tipoDe(g.nombre)] ?? 0)
+  || alfa(f.nombre, g.nombre) || (g.fecha || "").localeCompare(f.fecha || "");
 const tipoDe = nombre => { const c = (S.cursos || []).find(x => x.nombre === nombre); return c ? c.tipo : "Formación"; };
 async function cargarForms() {
   const { data, error } = await sb.from("formaciones").select("*").order("fecha", { ascending: false, nullsFirst: false });
@@ -323,11 +328,11 @@ async function cargarForms() {
 function editarFormacion(emp, item) {
   const dlg = h("dialog", {});
   const cursos = S.cursos || [];
-  const grupo = (titulo, t) => h("optgroup", { label: titulo }, cursos.filter(c => c.tipo === t).map(c => h("option", { value: c.nombre, selected: item && item.nombre === c.nombre }, c.nombre)));
+  const grupo = (titulo, t) => h("optgroup", { label: titulo }, cursos.filter(c => c.tipo === t).sort((x, y) => alfa(x.nombre, y.nombre)).map(c => h("option", { value: c.nombre, selected: item && item.nombre === c.nombre }, c.nombre)));
   const fuera = item && !cursos.some(c => c.nombre === item.nombre);   // registro antiguo que no está en la lista
   const nombre = h("select", {}, !item ? h("option", { value: "" }, "— Elige —") : null,
     fuera ? h("option", { value: item.nombre, selected: true }, item.nombre + " (ya no está en la lista)") : null,
-    grupo("Habilitaciones", "Habilitación"), grupo("Formaciones", "Formación"), grupo("Material de dotación", "Material"));
+    grupo("Formaciones", "Formación"), grupo("Habilitaciones", "Habilitación"), grupo("Material de dotación", "Material"));
   const fecha = h("input", { type: "date", value: item && item.fecha ? item.fecha : hoyStr() });
   const sinFecha = h("input", { type: "checkbox", checked: !!item && !item.fecha });
   const sync = () => { fecha.disabled = sinFecha.checked; };
@@ -373,7 +378,7 @@ function vistaFormacion() {
     S.fq = buscar.value;
     const orden = [S.me, ...S.emps.filter(e => e.id !== S.me.id)];
     const bloques = orden.map(e => {
-      const todas = (S.forms || []).filter(f => f.empleado_id === e.id);
+      const todas = (S.forms || []).filter(f => f.empleado_id === e.id).sort(cmpRegistros);
       const coincideNombre = q && e.nombre.toLowerCase().includes(q);
       const items = q && !coincideNombre ? todas.filter(f => f.nombre.toLowerCase().includes(q) || tipoDe(f.nombre).toLowerCase().includes(q)) : todas;
       if (q && !items.length) return null;

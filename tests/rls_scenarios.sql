@@ -69,6 +69,8 @@ select pg_temp.chk((select count(*) from net.llamadas) = 0, 'un cambio desde el 
 rollback;
 
 \echo == Cursos y habilitaciones (lista cerrada)
+select pg_temp.chk((select string_agg(nombre, ' | ' order by nombre) from cursos where tipo='Habilitación') = 'Extensible | IE - Taser 10 | IE - Taser 7', 'las habilitaciones ya no llevan "Habilitación" delante');
+select pg_temp.chk((select count(*) from cursos where nombre = 'Extensible (material)' and tipo = 'Material') = 1, 'el material extensible se distingue de la habilitación');
 select pg_temp.chk((select count(*) from cursos) = 14 and (select count(*) from cursos where tipo='Habilitación') = 3 and (select count(*) from cursos where tipo='Material') = 3, 'la lista tiene 3 habilitaciones, 8 formaciones y 3 materiales');
 begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
 select pg_temp.chk(not pg_temp.falla($$insert into formaciones(empleado_id,nombre,fecha) values (4,'Intervención vehículos','2026-03-02')$$), 'puede apuntar un curso de la lista (con tildes)');
