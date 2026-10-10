@@ -65,7 +65,7 @@ function pantallaLogin(msg) {
   $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Turno D"), h("div", { class: "sub" }, "Usera – Villaverde"), f));
 }
 
-function pantallaNuevaClave() {
+function pantallaNuevaClave(primera) {
   const p1 = h("input", { type: "password", placeholder: "Contraseña nueva (mín. 8 caracteres)", autocomplete: "new-password", required: true, minlength: 8 });
   const p2 = h("input", { type: "password", placeholder: "Repite la contraseña", autocomplete: "new-password", required: true });
   const err = h("div", { class: "error" }, "");
@@ -77,9 +77,12 @@ function pantallaNuevaClave() {
     const { error } = await sb.auth.updateUser({ password: p1.value });
     if (error) { err.textContent = "No se pudo cambiar: " + error.message; return; }
     history.replaceState(null, "", location.pathname);
+    await sb.rpc("marcar_clave_cambiada");
     S.recuperando = false; arrancar();
   } }, p1, p2, h("button", { class: "btn full", type: "submit" }, "Guardar contraseña"), err);
-  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Contraseña nueva"), h("div", { class: "sub" }, "Elige la que usarás desde ahora"), f));
+  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, primera ? "Elige tu contraseña" : "Contraseña nueva"),
+    h("div", { class: "sub" }, primera ? "Es tu primer acceso: elige una contraseña propia. Solo la sabrás tú." : "Elige la que usarás desde ahora"), f,
+    primera ? h("button", { class: "enlace", type: "button", onclick: salir }, "Salir") : null));
 }
 S.recuperando = /type=recovery/.test(location.hash);
 sb.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") { S.recuperando = true; pantallaNuevaClave(); } });
@@ -103,6 +106,7 @@ async function arrancar() {
   if (tc) S.tercio = +tc.valor || 4;
   S.me = S.emps.find(x => (x.email || "").toLowerCase() === email) || null;
   if (!S.me) return sinAcceso("Tu cuenta no está autorizada en Turno D. Habla con un responsable.");
+  if (S.me.clave_cambiada === false) return pantallaNuevaClave(true);
   const t = new Date(); S.y = t.getFullYear(); S.m = t.getMonth(); S.sel = hoyStr();
   const [r1, r2, pc] = await Promise.all([
     sb.from("dias").select("fecha").order("fecha").limit(1),
@@ -614,7 +618,41 @@ function bloqueAvisos() {
   return caja;
 }
 
+// ---------- copia de seguridad (solo administrador) ----------
+async function leerTodo(tabla, orden) {
+  const out = [];
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await sb.from(tabla).select("*").order(orden).range(desde, desde + 999);
+    if (error) throw error;
+    out.push(...data);
+    if (data.length < 1000) break;
+  }
+  return out;
+}
+const xmlEsc = v => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function hojaXml(nombre, filas) {
+  const cols = filas.length ? Object.keys(filas[0]) : [];
+  const cel = v => `<Cell><Data ss:Type="${typeof v === "number" ? "Number" : "String"}">${xmlEsc(v)}</Data></Cell>`;
+  return `<Worksheet ss:Name="${xmlEsc(nombre)}"><Table><Row>${cols.map(cel).join("")}</Row>` +
+    filas.map(f => `<Row>${cols.map(c => cel(f[c])).join("")}</Row>`).join("") + `</Table></Worksheet>`;
+}
+async function descargarCopia(btn, msg) {
+  btn.disabled = true; msg.textContent = "Preparando la copia…";
+  try {
+    const t = [["Calendario", "dias", "fecha"], ["Asignaciones", "asignaciones", "fecha"], ["Empleados", "empleados", "orden"], ["Codigos", "codigos", "orden"],
+      ["Formaciones", "formaciones", "id"], ["Cursos", "cursos", "orden"], ["Cambios", "cambios", "creado_en"]];
+    const hojas = [];
+    for (const [n, tabla, ord] of t) hojas.push(hojaXml(n, await leerTodo(tabla, ord)));
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">${hojas.join("")}</Workbook>`;
+    const a = h("a", { href: URL.createObjectURL(new Blob([xml], { type: "application/xml" })), download: `copia-turno-d-${hoyStr()}.xml` });
+    document.body.append(a); a.click(); a.remove();
+    msg.textContent = "Copia descargada ✔ (ábrela con Excel)";
+  } catch (e) { msg.textContent = "No se pudo hacer la copia: " + (e.message || e); }
+  btn.disabled = false;
+}
+
 function vistaCuenta() {
+  const msgCopia = h("div", { class: "sub" });
   const p1 = h("input", { type: "password", placeholder: "Nueva contraseña (mín. 8 caracteres)", autocomplete: "new-password" });
   const p2 = h("input", { type: "password", placeholder: "Repite la contraseña", autocomplete: "new-password" });
   const msg = h("div", { class: "error" });
@@ -632,8 +670,10 @@ function vistaCuenta() {
       if (p1.value !== p2.value) { msg.textContent = "No coinciden."; return; }
       const { error } = await sb.auth.updateUser({ password: p1.value });
       msg.textContent = error ? "No se pudo cambiar: " + error.message : "Contraseña cambiada ✔";
-      if (!error) { p1.value = p2.value = ""; }
+      if (!error) { p1.value = p2.value = ""; sb.rpc("marcar_clave_cambiada"); }
     } }, "Guardar contraseña"), msg,
+    S.me.admin ? [h("h3", {}, "Copia de seguridad"), h("p", { class: "sub" }, "Descarga todo (calendario, asignaciones, formaciones y cambios) en un archivo que abre Excel. Guárdalo de vez en cuando."),
+      h("button", { class: "btn sec full", onclick: ev => descargarCopia(ev.currentTarget, msgCopia) }, "Descargar copia"), msgCopia] : null,
     h("hr"), h("button", { class: "btn sec full", onclick: salir }, "Cerrar sesión"));
 }
 

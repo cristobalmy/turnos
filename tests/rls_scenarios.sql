@@ -132,3 +132,11 @@ select pg_temp.chk(pg_temp.filas($$delete from asignaciones where empleado_id=4 
 select pg_temp.chk(pg_temp.filas($$update empleados set orden=orden where nombre='Gustavo'$$) = 1, 'puede gestionar empleados');
 select pg_temp.chk(pg_temp.filas($$update config set valor='6' where clave='minimo_operativo'$$) = 1, 'puede cambiar el mínimo operativo');
 rollback;
+
+\echo == Primer acceso (contraseña elegida)
+begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
+select pg_temp.chk((select not clave_cambiada from empleados where nombre='Gustavo'), 'al principio nadie ha elegido contraseña');
+select pg_temp.chk(not pg_temp.falla($$select marcar_clave_cambiada()$$), 'puede marcar su propia contraseña como elegida');
+select pg_temp.chk((select clave_cambiada from empleados where nombre='Gustavo'), 'queda marcada');
+select pg_temp.chk((select not clave_cambiada from empleados where nombre='Nacho'), 'y no toca a los demás');
+rollback;

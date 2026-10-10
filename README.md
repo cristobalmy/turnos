@@ -30,6 +30,7 @@ Después, `supabase/migracion_007_dias_pasados.sql` (los días pasados quedan bl
 
 Después, `supabase/migracion_008_nombres_habilitaciones.sql` (nombres de las habilitaciones sin la palabra "Habilitación").
 Después, `supabase/migracion_009_dias_2027.sql` (calendario de 2027, continuando el ciclo de 12 días).
+Después, `supabase/migracion_010_primer_acceso.sql` (cada persona elige su contraseña al entrar por primera vez).
 
 ## Avisos al móvil (opcional)
 1. Supabase → Edge Functions → *Deploy a new function* → *Via Editor*, nombre `avisar`, pegar `supabase/functions/avisar/index.ts`. Desactivar *Verify JWT*.
