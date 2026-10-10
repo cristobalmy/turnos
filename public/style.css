@@ -1,4 +1,4 @@
-:root{--cab:#0f2a4a;--fondo:#f6f8fb;--card:#fff;--linea:#eceff3;--hov:var(--hov);--finde:#f7f9fc;--rayaA:#f4f6f9;--rayaB:#e9edf2;--selA:#e3eefb;--selB:#d3e3f7;--bajo:#fbd5d0;--azul:#0f2a4a;--azul2:#2f7bd8;--azul-claro:#e8f1fd;--gris:#eef1f5;--borde:#dde2e9;--txt:#1b2733;--suave:#6a7684;--rojo:#c0392b;--verde:#1e8e4e;
+:root{--cab:#0f2a4a;--fondo:#f6f8fb;--card:#fff;--linea:#eceff3;--hov:#f1f6fd;--finde:#f7f9fc;--rayaA:#f4f6f9;--rayaB:#e9edf2;--selA:#e3eefb;--selB:#d3e3f7;--bajo:#fbd5d0;--azul:#0f2a4a;--azul2:#2f7bd8;--azul-claro:#e8f1fd;--gris:#eef1f5;--borde:#dde2e9;--txt:#1b2733;--suave:#6a7684;--rojo:#c0392b;--verde:#1e8e4e;
  --aus:#cfe3fb;--aus-t:#0c3b7a;--trab:#2563b8;--trab-t:#fff;--mod:#111;--mod-t:#fff;--esp:#f8d4d0;--esp-t:#8a1c12}
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%}
@@ -52,13 +52,13 @@ nav.tabs svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2
 @media (max-width:700px){.wrap{border-radius:0;border-left:0;border-right:0;max-height:calc(100vh - 330px)}}
 table.cal{border-collapse:separate;border-spacing:0;font-size:.82rem;width:100%}
 .cal th,.cal td{border-right:1px solid var(--linea);border-bottom:1px solid var(--linea);min-width:36px;height:38px;text-align:center;padding:0}
-.cal thead th{position:sticky;top:0;background:var(--card);z-index:3;font-weight:700;line-height:1.1;cursor:pointer;border-bottom:2px solid var(--borde)}
+.cal thead th{position:sticky;top:0;background:var(--card);z-index:6;font-weight:700;line-height:1.1;cursor:pointer;border-bottom:2px solid var(--borde)}
 .cal thead th small{display:block;font-weight:500;color:var(--suave);font-size:.78rem}
 .cal thead th.finde{color:var(--azul2)}
 .cal thead th.sel{background:var(--azul2);color:#fff}
 .cal thead th.sel small{color:#fff}
-.cal .nom{position:sticky;left:0;background:var(--card);z-index:2;min-width:96px;text-align:left;padding:0 .6rem;font-weight:600;white-space:nowrap;border-right:2px solid var(--borde)}
-.cal thead .nom{z-index:4;cursor:default}
+.cal .nom{position:sticky;left:0;background:var(--card);z-index:5;min-width:96px;text-align:left;padding:0 .6rem;font-weight:600;white-space:nowrap;border-right:2px solid var(--borde)}
+.cal thead .nom{z-index:8;cursor:default}
 .cal td.dia{cursor:pointer}
 .cal td.dia:hover{background:var(--hov)}
 .cal td.finde{background:var(--finde)}
@@ -73,8 +73,8 @@ table.cal{border-collapse:separate;border-spacing:0;font-size:.82rem;width:100%}
 .tur{font-weight:800;color:var(--azul)}
 .tur.L{color:#9aa4b1;font-weight:700}
 .cal tr.turno .nom,.cal tfoot .nom{color:var(--suave);font-weight:600}
-.cal tfoot th,.cal tfoot td{position:sticky;bottom:0;background:var(--card);z-index:3;border-top:2px solid var(--borde);font-weight:700}
-.cal tfoot .nom{z-index:4}
+.cal tfoot th,.cal tfoot td{position:sticky;bottom:0;background:var(--card);z-index:6;border-top:2px solid var(--borde);font-weight:700}
+.cal tfoot .nom{z-index:8}
 .cal tfoot td.bajo{background:var(--bajo);color:var(--rojo)}
 .cal tfoot td.ok{color:var(--verde)}
 .leyenda{max-width:1400px;margin:.6rem auto;padding:0 .9rem;color:var(--suave);font-size:.8rem;display:flex;gap:.8rem;flex-wrap:wrap}
@@ -124,7 +124,8 @@ input{background:var(--card);color:var(--txt)}
 /* ---- resaltar la fila de una persona ---- */
 .cal .nom{cursor:pointer}
 .cal thead .nom,.cal tfoot .nom,.cal tr.turno .nom{cursor:default}
-.cal.conSel tbody tr:not(.fsel):not(.turno){opacity:.4}
+.cal.conSel tbody tr:not(.fsel):not(.turno) td{opacity:.4}
+.cal.conSel tbody tr:not(.fsel):not(.turno) .nom{color:var(--suave);font-weight:500}
 .cal tr.fsel td{background:var(--azul-claro);box-shadow:inset 0 2px 0 var(--azul2),inset 0 -2px 0 var(--azul2)}
 .cal tr.fsel td.libre{background:repeating-linear-gradient(45deg,var(--selA),var(--selA) 4px,var(--selB) 4px,var(--selB) 8px)}
 .cal tr.fsel .nom{background:var(--azul2);color:#fff}
@@ -133,3 +134,4 @@ input{background:var(--card);color:var(--txt)}
 /* ---- fila del tercio encima de "Trabajan" ---- */
 .cal tfoot tr:first-child th,.cal tfoot tr:first-child td{bottom:39px;border-top:2px solid var(--borde)}
 .cal tfoot tr:last-child th,.cal tfoot tr:last-child td{border-top:1px solid var(--linea)}
+.pag .sub{color:var(--suave);font-size:.9rem;margin:.2rem 0 .5rem}

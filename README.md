@@ -18,3 +18,10 @@ App web instalable (PWA) para el equipo. Supabase (base de datos + acceso) + Ver
 
 ## Pruebas
 `bash tests/rls.sh` levanta un Postgres local desechable y comprueba esquema, importación y permisos.
+
+## Avisos al móvil (opcional)
+1. Supabase → Edge Functions → *Deploy a new function* → *Via Editor*, nombre `avisar`, pegar `supabase/functions/avisar/index.ts`. Desactivar *Verify JWT*.
+2. Edge Functions → Secrets: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:tu@correo`) y `AVISO_SECRET`.
+3. SQL Editor: ejecutar `supabase/migracion_002_avisos.sql` con `__SECRETO__` sustituido por el valor de `AVISO_SECRET`.
+4. En cada móvil: Cuenta → *Activar avisos* (en iPhone, con la app instalada en la pantalla de inicio).
+La clave pública VAPID va en `public/config.js`; la privada y el secreto nunca se suben al repositorio.

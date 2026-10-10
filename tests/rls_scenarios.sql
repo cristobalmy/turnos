@@ -50,6 +50,24 @@ select pg_temp.chk(pg_temp.falla($$insert into asignaciones(empleado_id,fecha,co
 select pg_temp.chk(not pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values (1,'2026-12-01','V1')$$), 'pero sí otros códigos');
 rollback;
 
+\echo == Avisos al móvil
+begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
+select pg_temp.chk(not pg_temp.falla($$insert into push_subs(endpoint,empleado_id,p256dh,auth) values ('https://push/g',4,'k','a')$$), 'puede apuntar su propio móvil');
+select pg_temp.chk(pg_temp.falla($$insert into push_subs(endpoint,empleado_id,p256dh,auth) values ('https://push/x',3,'k','a')$$), 'NO puede apuntar un móvil a nombre de otra persona');
+insert into asignaciones(empleado_id,fecha,codigo) values (4,'2026-11-03','V1');
+insert into asignaciones(empleado_id,fecha,codigo) values (4,'2026-11-04','V1');
+reset role;
+select pg_temp.chk((select count(*) from net.llamadas) = 2, 'cada cambio hecho en la app lanza la llamada de aviso');
+select pg_temp.chk((select body->>'hecho_por' from net.llamadas limit 1) = '4' and (select headers->>'x-aviso-secret' from net.llamadas limit 1) = 'secreto-de-prueba', 'la llamada lleva el autor y el secreto');
+select pg_temp.chk((select count(*) from cambios where avisado) = 0, 'los cambios nuevos quedan pendientes de avisar');
+rollback;
+begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"nacho@t.es"}',true);
+select pg_temp.chk((select count(*) from push_subs) = 0, 'nadie ve los móviles de los demás');
+rollback;
+begin; insert into asignaciones(empleado_id,fecha,codigo) values (4,'2026-11-05','V1');
+select pg_temp.chk((select count(*) from net.llamadas) = 0, 'un cambio desde el panel de Supabase no genera aviso');
+rollback;
+
 \echo == Responsable (Nacho, id 3)
 begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"NACHO@t.es"}',true);
 select pg_temp.chk(not pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values (4,'2026-11-02','PICO')$$), 'puede poner PICO a otra persona (el email no distingue mayúsculas)');

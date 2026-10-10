@@ -1,6 +1,6 @@
 (() => {
 "use strict";
-const { SUPABASE_URL, SUPABASE_KEY } = window.TURNOS_CONFIG;
+const { SUPABASE_URL, SUPABASE_KEY, VAPID_PUBLIC } = window.TURNOS_CONFIG;
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 const $app = document.getElementById("app");
 
@@ -289,12 +289,59 @@ function vistaHistorial() {
   return h("div", { class: "pag" }, h("h2", {}, "Últimos cambios"), ul);
 }
 
+// ---------- avisos al móvil (push) ----------
+const b64aBytes = s => { const p = "=".repeat((4 - s.length % 4) % 4), r = atob((s + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(r, c => c.charCodeAt(0)); };
+const pushDisponible = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+async function suscripcionActual() {
+  if (!pushDisponible()) return null;
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+async function activarAvisos() {
+  const perm = await Notification.requestPermission();
+  if (perm !== "granted") { toast("Has bloqueado los avisos. Actívalos en los ajustes del móvil para esta app.", 6000); return false; }
+  const reg = await navigator.serviceWorker.ready;
+  const sub = (await reg.pushManager.getSubscription()) ||
+    (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64aBytes(VAPID_PUBLIC) }));
+  const j = sub.toJSON();
+  const { error } = await sb.from("push_subs").upsert({ endpoint: j.endpoint, empleado_id: S.me.id, p256dh: j.keys.p256dh, auth: j.keys.auth }, { onConflict: "endpoint" });
+  if (error) { toast("No se pudo guardar el aviso: " + error.message, 6000); return false; }
+  return true;
+}
+async function desactivarAvisos() {
+  const sub = await suscripcionActual();
+  if (!sub) return;
+  await sb.from("push_subs").delete().eq("endpoint", sub.endpoint);
+  await sub.unsubscribe();
+}
+function bloqueAvisos() {
+  const estado = h("div", { class: "sub" }, "Comprobando…");
+  const caja = h("div", {}, estado);
+  const pintarEstado = async () => {
+    if (!pushDisponible()) {
+      estado.textContent = "Este navegador no permite avisos. En iPhone, instala primero la app en la pantalla de inicio (Compartir → Añadir a pantalla de inicio) y ábrela desde ahí.";
+      return;
+    }
+    const sub = await suscripcionActual();
+    const on = !!sub && Notification.permission === "granted";
+    estado.textContent = on ? "Avisos activados en este móvil." : (Notification.permission === "denied" ? "Avisos bloqueados en los ajustes del móvil." : "Avisos desactivados en este móvil.");
+    const bs = [h("button", { class: "btn full", onclick: async ev => { ev.target.disabled = true; if (on) await desactivarAvisos(); else await activarAvisos(); pintarEstado(); } }, on ? "Desactivar avisos" : "Activar avisos")];
+    if (on) bs.push(h("button", { class: "btn sec full", onclick: async () => { const r = await navigator.serviceWorker.ready; r.showNotification("Turno D", { body: "Los avisos funcionan en este móvil ✔", icon: "icon-192.png" }); } }, "Probar en este móvil"));
+    caja.replaceChildren(estado, ...bs);
+  };
+  pintarEstado();
+  return caja;
+}
+
 function vistaCuenta() {
   const p1 = h("input", { type: "password", placeholder: "Nueva contraseña (mín. 8 caracteres)", autocomplete: "new-password" });
   const p2 = h("input", { type: "password", placeholder: "Repite la contraseña", autocomplete: "new-password" });
   const msg = h("div", { class: "error" });
   return h("div", { class: "pag" },
     h("h2", {}, S.me.nombre), h("p", {}, (S.me.rol === "responsable" ? "Responsable" : "Agente") + " · " + S.me.email),
+    h("h3", {}, "Avisos de cambios"),
+    h("p", { class: "sub" }, "Recibe una notificación cuando alguien del equipo apunte o cambie un código."),
+    bloqueAvisos(),
     h("h3", {}, "Apariencia"),
     h("div", { class: "opciones" }, [["auto", "Automático"], ["claro", "Claro"], ["oscuro", "Oscuro"]].map(([v, t]) =>
       h("button", { class: "btn sec" + (miTema() === v ? " act" : ""), onclick: () => { try { localStorage.setItem("tema", v); } catch (e) {} aplicarTema(); pintar(); } }, t))),
