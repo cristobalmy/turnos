@@ -269,7 +269,10 @@ function bloquePico() {
 }
 
 // Selector directo de mes y año
-function abrirSelectorMes(irA) {
+async function abrirSelectorMes(irA) {
+  // Se vuelve a mirar hasta qué año hay datos, por si se añadieron después de abrir la app.
+  const r2 = await sb.from("dias").select("fecha").order("fecha", { ascending: false }).limit(1);
+  if (r2.data && r2.data[0]) S.anioMax = Math.max(S.anioMax, +r2.data[0].fecha.slice(0, 4));
   let anio = S.y;
   const dlg = h("dialog", {});
   const cont = h("div", {});
