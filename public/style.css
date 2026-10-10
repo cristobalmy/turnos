@@ -257,3 +257,8 @@ table.res .rnota td{font-size:.75rem;color:var(--suave);text-align:left}
   #imprimir thead th,#imprimir tbody th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 .ipicos th{font-size:.7rem}
+/* barra del mes: en pantallas estrechas los botones pasan a una segunda línea en vez de ensanchar la página */
+.mes{flex-wrap:wrap;gap:.45rem .5rem;padding:.6rem .5rem}
+.mes b{min-width:0;flex:0 1 auto}
+.mes .hoybtn{padding:.3rem .7rem}
+.mesacc{display:flex;gap:.5rem}

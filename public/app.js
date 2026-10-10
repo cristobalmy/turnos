@@ -539,9 +539,10 @@ function vistaCalendario() {
   })));
   return h("div", {},
     h("div", { class: "mes" }, h("button", { onclick: () => irMes(-1) }, "‹"), h("b", { class: "mesSel", title: "Elegir mes y año", onclick: () => abrirSelectorMes(irAMes) }, `${MESES[S.m]} ${S.y} ▾`), h("button", { onclick: () => irMes(1) }, "›"),
-      h("button", { class: "hoybtn", onclick: () => irMes(0, true) }, "Hoy"),
-      h("button", { class: "hoybtn", title: "Descargar el mes en Excel", onclick: exportarExcel }, "Excel"),
-      h("button", { class: "hoybtn", title: "Guardar el mes en PDF", onclick: exportarPDF }, "PDF")),
+      h("div", { class: "mesacc" },
+        h("button", { class: "hoybtn", onclick: () => irMes(0, true) }, "Hoy"),
+        h("button", { class: "hoybtn", title: "Descargar el mes en Excel", onclick: exportarExcel }, "Excel"),
+        h("button", { class: "hoybtn", title: "Guardar el mes en PDF", onclick: exportarPDF }, "PDF"))),
     h("div", { class: "resumen" }, resumenDia()),
     bloquePico(),
     h("div", { style: "height:.7rem" }),
