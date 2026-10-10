@@ -5,7 +5,15 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { pe
 const $app = document.getElementById("app");
 
 const S = { me: null, emps: [], cods: {}, minimo: 6, tercio: 4, y: 0, m: 0, dias: {}, asig: {}, vista: "res", canal: null, rsel: {} };
-const R = { dias: {}, asig: {} };   // datos del resumen (turno actual y siguiente), independientes del mes que se vea
+const R = { dias: {}, asig: {} };
+S.notas = {};   // mis notas privadas: fecha -> texto
+async function cargarNotas(desde, hasta) {
+  const n = await sb.from("notas").select("fecha,texto").gte("fecha", desde).lte("fecha", hasta);
+  if (n.error) return;   // si todavía no existe la tabla, simplemente no hay notas
+  for (let d = desde; d <= hasta; d = nextDay(d)) delete S.notas[d];
+  for (const x of n.data) S.notas[x.fecha] = x.texto;
+}
+const nextDay = f => { const [y, m, d] = f.split("-").map(Number), t = new Date(y, m - 1, d + 1); return fechaStr(t.getFullYear(), t.getMonth(), t.getDate()); };   // datos del resumen (turno actual y siguiente), independientes del mes que se vea
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DSEM = ["D","L","M","X","J","V","S"];
 
@@ -62,7 +70,7 @@ function pantallaLogin(msg) {
       // Mensaje neutro: no se revela si el correo existe.
       err.textContent = "Si ese correo está autorizado, te llegará un mensaje con un enlace para crear una contraseña nueva. Mira también el correo no deseado.";
     } }, "¿Has olvidado la contraseña?"));
-  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Usera-Villaverde D2"), f));
+  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Usera-Villaverde"), h("div", { class: "sub" }, "Turno D2"), f));
 }
 
 function pantallaNuevaClave(primera) {
@@ -107,6 +115,10 @@ async function arrancar() {
   S.me = S.emps.find(x => (x.email || "").toLowerCase() === email) || null;
   if (!S.me) return sinAcceso("Tu cuenta no está autorizada en Turno D. Habla con un responsable.");
   if (S.me.clave_cambiada === false) return pantallaNuevaClave(true);
+  if (S.me.distrito_id) {
+    const dd = await sb.from("distritos").select("minimo_operativo,tercio").eq("id", S.me.distrito_id).maybeSingle();
+    if (dd.data) { S.minimo = dd.data.minimo_operativo || S.minimo; S.tercio = dd.data.tercio || S.tercio; }
+  }
   const t = new Date(); S.y = t.getFullYear(); S.m = t.getMonth(); S.sel = hoyStr();
   const [r1, r2, pc] = await Promise.all([
     sb.from("dias").select("fecha").order("fecha").limit(1),
@@ -136,6 +148,7 @@ async function cargarMes() {
   if (d.error || a.error) { toast("Error al cargar el mes"); return; }
   S.dias = Object.fromEntries(d.data.map(x => [x.fecha, x.turno]));
   S.asig = Object.fromEntries(a.data.map(x => [x.empleado_id + "|" + x.fecha, x.codigo]));
+  cargarNotas(desde, hasta).then(() => { if (S.vista === "cal") pintar(); });
   // Hoy y mañana también (para la recomendación de pico), aunque se esté viendo otro mes.
   const t = new Date(), h0 = fechaStr(t.getFullYear(), t.getMonth(), t.getDate()), t2 = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1), h1 = fechaStr(t2.getFullYear(), t2.getMonth(), t2.getDate());
   if (!(h0 >= desde && h1 <= hasta)) {
@@ -226,7 +239,7 @@ const DLARGO = ["domingo","lunes","martes","miércoles","jueves","viernes","sáb
 function cabecera() {
   const b = (v, txt) => h("button", { class: S.vista === v ? "on" : "", onclick: () => { S.vista = v; pintar(); } }, icono(v), txt);
   return h("header", {},
-    h("div", { class: "marca" }, h("i", {}, "D2"), "Usera-Villaverde D2"),
+    h("div", { class: "marca" }, h("i", {}, "D2"), "Usera-Villaverde"),
     h("nav", { class: "tabs" }, b("res", "Resumen"), b("cal", "Calendario"), b("form", "Formación"), b("inf", "Informes"), b("hist", "Cambios"), b("cuenta", "Cuenta")),
     h("span", { class: "yo" }, S.me.nombre));
 }
@@ -285,6 +298,7 @@ async function cargarResumen() {
   if (d.error || x.error) { toast("Error al cargar el resumen"); return; }
   R.dias = Object.fromEntries(d.data.map(r => [r.fecha, r.turno]));
   R.asig = Object.fromEntries(x.data.map(r => [r.empleado_id + "|" + r.fecha, r.codigo]));
+  cargarNotas(bloqueFechas(k)[0], bloqueFechas(k + 1)[5]).then(() => { if (S.vista === "res") pintar(); });
   // mantiene S.asig de hoy y mañana coherente para el pico recomendado
 }
 // ---------- datos del año completo (informes y recomendación de ausencias) ----------
@@ -358,6 +372,7 @@ function panelBloque(titulo, k, clase) {
       }),
       fila("Personal activo", "rl", f => h("td", {}, h("ul", {}, S.emps.filter(e => trabajaR(e.id, f)).map(e => persona(e, f))))),
       fila("Ausencias", "rl", f => h("td", {}, h("ul", {}, S.emps.filter(e => !trabajaR(e.id, f)).map(e => persona(e, f))))),
+      fechas.some(f => S.notas[f]) ? fila("Mi nota", "rnota", f => h("td", {}, S.notas[f] ? h("small", {}, S.notas[f]) : "")) : null,
       hayQuitar ? fila("Quitarse", "rq", f => {
         if (f < hoy || tercioR(f) <= S.tercio) return h("td", {});
         const r = recomendarQuitar(f); if (!r.length) return h("td", {});
@@ -416,6 +431,56 @@ async function abrirSelectorMes(irA) {
   document.body.append(dlg); dlg.showModal();
 }
 
+// ---------- exportar el mes (Excel y PDF) ----------
+const COLGRP = { a: ["#CFE3FB", "#0C3B7A"], t: ["#2563B8", "#FFFFFF"], m: ["#111111", "#FFFFFF"], e: ["#F8D4D0", "#8A1F14"] };
+function datosMes() {
+  const nd = new Date(S.y, S.m + 1, 0).getDate(), dias = Array.from({ length: nd }, (_, i) => i + 1);
+  const serv = f => ["M", "T", "N"].includes(S.dias[f]);
+  return { dias, titulo: `Usera-Villaverde D2 · ${MESES[S.m]} ${S.y}`, serv,
+    tercio: dias.map(d => { const f = fechaStr(S.y, S.m, d); return serv(f) ? enTercio(f) : null; }),
+    trabajan: dias.map(d => { const f = fechaStr(S.y, S.m, d); return serv(f) ? S.emps.filter(e => trabaja(e.id, f)).length : null; }) };
+}
+function descargar(nombre, contenido, tipo) {
+  const a = h("a", { href: URL.createObjectURL(new Blob([contenido], { type: tipo })), download: nombre });
+  document.body.append(a); a.click(); a.remove();
+}
+function exportarExcel() {
+  const D = datosMes();
+  const cel = (v, st) => `<Cell${st ? ` ss:StyleID="${st}"` : ""}><Data ss:Type="${typeof v === "number" ? "Number" : "String"}">${xmlEsc(v)}</Data></Cell>`;
+  const fila = cs => `<Row>${cs.join("")}</Row>`;
+  const filas = [
+    fila([cel(D.titulo, "n"), ...D.dias.map(d => cel(DSEM[new Date(S.y, S.m, d).getDay()] + " " + d, "h"))]),
+    fila([cel("Turno", "n"), ...D.dias.map(d => cel(tl(S.dias[fechaStr(S.y, S.m, d)]), "c"))]),
+    ...S.emps.map(e => fila([cel(e.nombre, "n"), ...D.dias.map(d => { const c = S.asig[e.id + "|" + fechaStr(S.y, S.m, d)]; return cel(c || "", c ? "g" + grupoDe(c) : "c"); })])),
+    fila([cel(`Tercio (máx. ${S.tercio})`, "n"), ...D.tercio.map(n => n == null ? cel("–", "c") : cel(n, n > S.tercio ? "b" : "c"))]),
+    fila([cel("Trabajan", "n"), ...D.trabajan.map(n => n == null ? cel("–", "c") : cel(n, n < S.minimo ? "b" : "c"))]),
+  ];
+  const est = (id, bg, fg, extra = "") => `<Style ss:ID="${id}"><Alignment ss:Horizontal="Center"/><Interior ss:Color="${bg}" ss:Pattern="Solid"/><Font ss:Color="${fg}"${extra}/></Style>`;
+  const estilos = `<Styles><Style ss:ID="n"><Font ss:Bold="1"/></Style><Style ss:ID="c"><Alignment ss:Horizontal="Center"/></Style>` +
+    est("h", "#E8F1FD", "#0F2A4A", ' ss:Bold="1"') + est("b", "#FBD5D0", "#C0392B", ' ss:Bold="1"') +
+    Object.entries(COLGRP).map(([g, [bg, fg]]) => est("g" + g, bg, fg, ' ss:Bold="1"')).join("") + `</Styles>`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">${estilos}<Worksheet ss:Name="${xmlEsc(MESES[S.m] + " " + S.y)}"><Table><Column ss:Width="95"/>${filas.join("")}</Table></Worksheet></Workbook>`;
+  descargar(`calendario-${S.y}-${pad(S.m + 1)}.xml`, xml, "application/xml");
+}
+function exportarPDF() {
+  const D = datosMes(), ant = document.getElementById("imprimir");
+  if (ant) ant.remove();
+  const celdaCod = (c) => c ? h("td", { class: "pc", style: `background:${COLGRP[grupoDe(c)][0]};color:${COLGRP[grupoDe(c)][1]}` }, c) : h("td", {});
+  const doc = h("div", { id: "imprimir" }, h("h2", {}, D.titulo),
+    h("table", {},
+      h("thead", {}, h("tr", {}, h("th", {}, ""), D.dias.map(d => h("th", {}, DSEM[new Date(S.y, S.m, d).getDay()], h("br"), d)))),
+      h("tbody", {},
+        h("tr", {}, h("th", {}, "Turno"), D.dias.map(d => h("td", {}, tl(S.dias[fechaStr(S.y, S.m, d)])))),
+        S.emps.map(e => h("tr", {}, h("th", {}, e.nombre), D.dias.map(d => celdaCod(S.asig[e.id + "|" + fechaStr(S.y, S.m, d)])))),
+        h("tr", {}, h("th", {}, `Tercio (máx. ${S.tercio})`), D.tercio.map(n => h("td", { class: n != null && n > S.tercio ? "pbajo" : "" }, n == null ? "–" : n))),
+        h("tr", {}, h("th", {}, "Trabajan"), D.trabajan.map(n => h("td", { class: n != null && n < S.minimo ? "pbajo" : "" }, n == null ? "–" : n))))));
+  document.body.append(doc);
+  document.body.classList.add("imprimiendo");
+  const limpiar = () => { document.body.classList.remove("imprimiendo"); const x = document.getElementById("imprimir"); if (x) x.remove(); };
+  window.addEventListener("afterprint", limpiar, { once: true });
+  setTimeout(() => window.print(), 80);
+}
+
 function vistaCalendario() {
   const nd = new Date(S.y, S.m + 1, 0).getDate(), hoy = hoyStr();
   const dias = Array.from({ length: nd }, (_, i) => i + 1);
@@ -444,7 +509,7 @@ function vistaCalendario() {
     h("th", { class: "nom", title: "Resaltar su fila", onclick: () => { S.fsel = S.fsel === e.id ? null : e.id; pintar(); } }, e.nombre),
     dias.map(d => {
       const f = fechaStr(S.y, S.m, d), c = S.asig[e.id + "|" + f], t = S.dias[f];
-      return h("td", { class: "dia " + cls(d, f) + (t === "S" || t === "L" ? " libre" : "") + (esPasado(f) && !S.me.admin ? " pasado" : ""), onclick: () => { S.sel = f; abrirEdicion(e, f); } },
+      return h("td", { class: "dia " + cls(d, f) + (t === "S" || t === "L" ? " libre" : "") + (esPasado(f) && !S.me.admin ? " pasado" : "") + (e.id === S.me.id && S.notas[f] ? " nota" : ""), title: e.id === S.me.id && S.notas[f] ? S.notas[f] : null, onclick: () => { S.sel = f; abrirEdicion(e, f); } },
         c ? h("span", { class: "cod " + claseTipo(c) }, c) : "");
     }))));
   const filaTercio = h("tr", {}, h("th", { class: "nom", title: "Ausentes por vacaciones o permisos" }, `Tercio (máx. ${S.tercio})`), dias.map(d => {
@@ -461,7 +526,9 @@ function vistaCalendario() {
   })));
   return h("div", {},
     h("div", { class: "mes" }, h("button", { onclick: () => irMes(-1) }, "‹"), h("b", { class: "mesSel", title: "Elegir mes y año", onclick: () => abrirSelectorMes(irAMes) }, `${MESES[S.m]} ${S.y} ▾`), h("button", { onclick: () => irMes(1) }, "›"),
-      h("button", { class: "hoybtn", onclick: () => irMes(0, true) }, "Hoy")),
+      h("button", { class: "hoybtn", onclick: () => irMes(0, true) }, "Hoy"),
+      h("button", { class: "hoybtn", title: "Descargar el mes en Excel", onclick: exportarExcel }, "Excel"),
+      h("button", { class: "hoybtn", title: "Guardar el mes en PDF", onclick: exportarPDF }, "PDF")),
     h("div", { class: "resumen" }, resumenDia()),
     bloquePico(),
     h("div", { style: "height:.7rem" }),
@@ -482,6 +549,24 @@ function avisoDiaBloqueado(f) {
     h("div", { class: "fila" }, h("button", { class: "btn", onclick: () => dlg.close() }, "Entendido")));
   dlg.addEventListener("close", () => { dlg.remove(); pintar(); });
   document.body.append(dlg); dlg.showModal();
+}
+
+function bloqueNota(f) {
+  const ta = h("textarea", { maxlength: "500", rows: "2", placeholder: "Nota privada: solo la ves tú" });
+  ta.value = S.notas[f] || "";
+  const msg = h("small", { class: "det" }, "");
+  const guardarNota = async ev => {
+    ev.currentTarget.disabled = true;
+    const txt = ta.value.trim();
+    const { error } = txt
+      ? await sb.from("notas").upsert({ empleado_id: S.me.id, fecha: f, texto: txt, actualizado: new Date().toISOString() }, { onConflict: "empleado_id,fecha" })
+      : await sb.from("notas").delete().eq("empleado_id", S.me.id).eq("fecha", f);
+    ev.currentTarget.disabled = false;
+    if (error) { msg.textContent = "No se pudo guardar la nota."; return; }
+    if (txt) S.notas[f] = txt; else delete S.notas[f];
+    msg.textContent = txt ? "Nota guardada ✔" : "Nota borrada";
+  };
+  return h("div", { class: "nota-bloque" }, h("h4", {}, "Nota del día"), ta, h("div", { class: "fila" }, h("button", { class: "btn sec mini", onclick: guardarNota }, "Guardar nota"), msg));
 }
 
 function abrirEdicion(emp, f) {
@@ -506,6 +591,7 @@ function abrirEdicion(emp, f) {
     h("h3", {}, emp.nombre), h("p", { class: "sub" }, `${DLARGO[new Date(y, m - 1, d).getDay()]} ${d}/${m}/${y} · turno ${TURNO_NOMBRE[S.dias[f]] ? TURNO_NOMBRE[S.dias[f]].toLowerCase() : "?"}`),
     cand.length ? h("div", { class: "cand" }, "Candidatos a PICO (libres con pareja ausente): " + cand.map(c => c.nombre).join(", ")) : null,
     h("div", { class: "contenido" }, secciones),
+    emp.id === S.me.id ? bloqueNota(f) : null,
     h("div", { class: "fila" },
       h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cerrar"),
       actual ? h("button", { class: "btn sec", onclick: ev => elegir("", ev.currentTarget) }, "Quitar código") : null)].filter(Boolean));
@@ -764,6 +850,36 @@ async function descargarCopia(btn, msg) {
   btn.disabled = false;
 }
 
+// ---------- calendario en el móvil ----------
+function bloqueCalendario() {
+  const caja = h("div", {}, h("p", { class: "sub" }, "Cargando…"));
+  const nuevoToken = () => Array.from(crypto.getRandomValues(new Uint8Array(24)), b => b.toString(16).padStart(2, "0")).join("");
+  const urlDe = t => `${SUPABASE_URL}/functions/v1/calendario?t=${t}`;
+  const dibujar = token => {
+    if (!token) {
+      caja.replaceChildren(h("button", { class: "btn sec full", onclick: async () => {
+        const t = nuevoToken(); const { error } = await sb.from("calendario_tokens").upsert({ empleado_id: S.me.id, token: t }, { onConflict: "empleado_id" });
+        if (error) { toast("No se pudo crear el enlace"); return; } dibujar(t);
+      } }, "Crear mi enlace"));
+      return;
+    }
+    const url = urlDe(token), msg = h("small", { class: "det" }, "");
+    caja.replaceChildren(
+      h("input", { type: "text", readonly: true, value: url, onfocus: ev => ev.target.select() }),
+      h("div", { class: "fila" },
+        h("button", { class: "btn sec mini", onclick: async () => { try { await navigator.clipboard.writeText(url); msg.textContent = "Enlace copiado ✔"; } catch (e) { msg.textContent = "Mantén pulsado el enlace para copiarlo."; } } }, "Copiar"),
+        h("a", { class: "btn sec mini", href: url.replace(/^https:/, "webcal:") }, "Añadir al calendario del iPhone"),
+        h("button", { class: "btn sec mini", onclick: async () => { if (!confirm("El enlace anterior dejará de funcionar. ¿Crear uno nuevo?")) return;
+          const t = nuevoToken(); const { error } = await sb.from("calendario_tokens").upsert({ empleado_id: S.me.id, token: t }, { onConflict: "empleado_id" }); if (!error) dibujar(t); } }, "Cambiar enlace")),
+      msg, h("p", { class: "sub" }, "Es privado: quien lo tenga ve tus turnos. No lo compartas. En Android o Google Calendar: Otros calendarios → Desde URL."));
+  };
+  sb.from("calendario_tokens").select("token").eq("empleado_id", S.me.id).maybeSingle().then(({ data, error }) => {
+    if (error) caja.replaceChildren(h("p", { class: "sub" }, "No disponible todavía."));
+    else dibujar(data ? data.token : null);
+  });
+  return caja;
+}
+
 function vistaCuenta() {
   const msgCopia = h("div", { class: "sub" });
   const p1 = h("input", { type: "password", placeholder: "Nueva contraseña (mín. 8 caracteres)", autocomplete: "new-password" });
@@ -774,6 +890,9 @@ function vistaCuenta() {
     h("h3", {}, "Avisos de cambios"),
     h("p", { class: "sub" }, "Recibe una notificación cuando alguien del equipo apunte o cambie un código."),
     bloqueAvisos(),
+    h("h3", {}, "Calendario en el móvil"),
+    h("p", { class: "sub" }, "Tus turnos y vacaciones dentro de la aplicación Calendario de tu teléfono, al día automáticamente."),
+    bloqueCalendario(),
     h("h3", {}, "Apariencia"),
     h("div", { class: "opciones" }, [["auto", "Automático"], ["claro", "Claro"], ["oscuro", "Oscuro"]].map(([v, t]) =>
       h("button", { class: "btn sec" + (miTema() === v ? " act" : ""), onclick: () => { try { localStorage.setItem("tema", v); } catch (e) {} aplicarTema(); pintar(); } }, t))),

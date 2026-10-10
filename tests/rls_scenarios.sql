@@ -10,7 +10,7 @@ grant execute on function pg_temp.chk(boolean,text), pg_temp.falla(text), pg_tem
 
 \echo == Importación
 select pg_temp.chk((select count(*) from asignaciones) = 985, 'las 985 asignaciones del Excel están importadas');
-select pg_temp.chk((select count(*) from dias) = 365, '365 días con su turno');
+select pg_temp.chk((select count(*) from dias where fecha between '2026-01-01' and '2026-12-31') = 365, '365 días de 2026 con su turno');
 select pg_temp.chk((select count(*) from cambios) = 0, 'la importación no ensucia el historial');
 
 \echo == Sin sesión / email desconocido
@@ -139,4 +139,22 @@ select pg_temp.chk((select not clave_cambiada from empleados where nombre='Gusta
 select pg_temp.chk(not pg_temp.falla($$select marcar_clave_cambiada()$$), 'puede marcar su propia contraseña como elegida');
 select pg_temp.chk((select clave_cambiada from empleados where nombre='Gustavo'), 'queda marcada');
 select pg_temp.chk((select not clave_cambiada from empleados where nombre='Nacho'), 'y no toca a los demás');
+rollback;
+
+\echo == Crecimiento: años, distritos, notas privadas y enlace del calendario
+select pg_temp.chk((select max(fecha) from dias) = date '2035-12-31', 'el calendario llega hasta 2035');
+select pg_temp.chk((select turno from dias where fecha = '2027-01-01') = 'N', '1/1/2027 es noche (el ciclo continúa)');
+select pg_temp.chk((select count(*) from dias where fecha between '2027-01-01' and '2027-12-31') = 365, '2027 tiene 365 días');
+select pg_temp.chk((select count(*) from distritos where nombre = 'Usera-Villaverde') = 1 and (select count(*) from empleados where distrito_id is null) = 0, 'todos pertenecen a Usera-Villaverde');
+begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
+select pg_temp.chk(not pg_temp.falla($$insert into notas(empleado_id,fecha,texto) values (4,'2026-11-10','curso')$$), 'puede apuntar una nota propia');
+select pg_temp.chk(pg_temp.falla($$insert into notas(empleado_id,fecha,texto) values (3,'2026-11-10','de otro')$$), 'no puede apuntar notas a otra persona');
+select pg_temp.chk(not pg_temp.falla($$insert into calendario_tokens(empleado_id,token) values (4,'0123456789abcdef0123456789abcdef')$$), 'puede crear su enlace de calendario');
+select pg_temp.chk(pg_temp.falla($$insert into calendario_tokens(empleado_id,token) values (3,'fedcba9876543210fedcba9876543210')$$), 'no puede crear el de otro');
+rollback;
+begin; insert into notas(empleado_id,fecha,texto) values (4,'2026-11-10','secreta'); insert into calendario_tokens(empleado_id,token) values (4,'0123456789abcdef0123456789abcdef');
+set local role authenticated; select set_config('request.jwt.claims','{"email":"nacho@t.es"}',true);
+select pg_temp.chk(pg_temp.filas($$select 1 from notas$$) = 0, 'ni un responsable ve las notas de otros');
+select pg_temp.chk(pg_temp.filas($$select 1 from calendario_tokens$$) = 0, 'ni un responsable ve los enlaces de otros');
+select pg_temp.chk(pg_temp.filas($$update notas set texto='x'$$) = 0, 'ni puede cambiarlas');
 rollback;

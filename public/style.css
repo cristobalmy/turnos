@@ -234,3 +234,25 @@ table.res tbody th{width:4.6rem}
 table.ipicos{width:100%;border-collapse:collapse}.ipicos th,.ipicos td{padding:.4rem .3rem;border-bottom:1px solid var(--linea);text-align:center}
 .ipicos td:first-child,.ipicos th:first-child{text-align:left}.ipicos th{font-size:.78rem;color:var(--suave);text-transform:uppercase}
 table.res .rq td{font-size:.78rem;background:var(--bajo)}table.res .rq small{display:block;color:var(--suave);font-size:.68rem}
+
+/* notas, exportar, calendario móvil */
+.cal td.nota{position:relative}.cal td.nota::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:#e0a100}
+.nota-bloque textarea{width:100%;padding:.5rem;border:1px solid var(--borde);border-radius:10px;font:inherit;resize:vertical;background:var(--card);color:inherit}
+.nota-bloque h4{margin:.8rem 0 .3rem}
+table.res .rnota td{font-size:.75rem;color:var(--suave);text-align:left}
+.pag a.btn{text-decoration:none;display:inline-block}
+.fila{flex-wrap:wrap}
+#imprimir{display:none}
+@media print{
+  @page{size:A4 landscape;margin:8mm}
+  body.imprimiendo > *:not(#imprimir){display:none !important}
+  body.imprimiendo{background:#fff}
+  #imprimir{display:block;color:#000;font-family:system-ui,sans-serif}
+  #imprimir h2{font-size:13pt;margin:0 0 4mm;text-transform:capitalize}
+  #imprimir table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:7.5pt}
+  #imprimir th,#imprimir td{border:.4pt solid #888;padding:1.2mm 0;text-align:center}
+  #imprimir thead th{background:#e8f1fd}#imprimir tr > :first-child{width:27mm}#imprimir tbody th{text-align:left;padding-left:1.5mm;background:#f3f5f8;white-space:nowrap;overflow:hidden}
+  #imprimir td.pc{font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #imprimir td.pbajo{background:#fbd5d0;color:#c0392b;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #imprimir thead th,#imprimir tbody th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
