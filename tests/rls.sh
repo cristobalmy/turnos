@@ -24,6 +24,7 @@ $P -f supabase/migracion_011_codigos.sql >/dev/null
 $P -f supabase/migracion_012_quitar_automocion.sql >/dev/null
 $P -f supabase/migracion_013_crecimiento.sql >/dev/null
 $P -f supabase/migracion_013_crecimiento.sql >/dev/null   # repetirla no debe dar error
+$P -f supabase/migracion_014_matri.sql >/dev/null
 $P -f supabase/migracion_010_primer_acceso.sql >/dev/null   # repetirla no debe dar error
 $P -f tests/after_schema.sql
 $P -f tests/rls_scenarios.sql 2>&1 | grep -E "^(==|NOTICE|psql|ERROR)" | sed 's/^NOTICE:  //' | tee /tmp/rls_out.txt
