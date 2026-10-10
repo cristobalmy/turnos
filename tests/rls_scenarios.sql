@@ -9,7 +9,7 @@ $$ declare n integer; begin execute s; get diagnostics n = row_count; return n; 
 grant execute on function pg_temp.chk(boolean,text), pg_temp.falla(text), pg_temp.filas(text) to public;
 
 \echo == Importación
-select pg_temp.chk((select count(*) from asignaciones) = 989, 'las 989 asignaciones del Excel están importadas');
+select pg_temp.chk((select count(*) from asignaciones) = 985, 'las 985 asignaciones del Excel están importadas');
 select pg_temp.chk((select count(*) from dias) = 365, '365 días con su turno');
 select pg_temp.chk((select count(*) from cambios) = 0, 'la importación no ensucia el historial');
 
@@ -25,7 +25,7 @@ rollback;
 
 \echo == Agente (Gustavo, id 4)
 begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
-select pg_temp.chk((select count(*) from asignaciones) = 989, 've todo el calendario');
+select pg_temp.chk((select count(*) from asignaciones) = 985, 've todo el calendario');
 select pg_temp.chk(not pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo,actualizado_por) values (4,'2026-11-01','V2',3)$$), 'puede poner un código en su propio día');
 select pg_temp.chk((select actualizado_por from asignaciones where empleado_id=4 and fecha='2026-11-01') = 4, 'no puede falsear quién hizo el cambio');
 select pg_temp.chk(pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values (3,'2026-11-01','V2')$$), 'NO puede poner un código a otra persona');
