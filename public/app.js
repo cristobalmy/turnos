@@ -62,7 +62,7 @@ function pantallaLogin(msg) {
       // Mensaje neutro: no se revela si el correo existe.
       err.textContent = "Si ese correo está autorizado, te llegará un mensaje con un enlace para crear una contraseña nueva. Mira también el correo no deseado.";
     } }, "¿Has olvidado la contraseña?"));
-  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Turno D"), h("div", { class: "sub" }, "Usera – Villaverde"), f));
+  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Usera-Villaverde D2"), f));
 }
 
 function pantallaNuevaClave(primera) {
@@ -226,7 +226,7 @@ const DLARGO = ["domingo","lunes","martes","miércoles","jueves","viernes","sáb
 function cabecera() {
   const b = (v, txt) => h("button", { class: S.vista === v ? "on" : "", onclick: () => { S.vista = v; pintar(); } }, icono(v), txt);
   return h("header", {},
-    h("div", { class: "marca" }, h("i", {}, "D"), "Turno D"),
+    h("div", { class: "marca" }, h("i", {}, "D2"), "Usera-Villaverde D2"),
     h("nav", { class: "tabs" }, b("res", "Resumen"), b("cal", "Calendario"), b("form", "Formación"), b("inf", "Informes"), b("hist", "Cambios"), b("cuenta", "Cuenta")),
     h("span", { class: "yo" }, S.me.nombre));
 }
