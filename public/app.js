@@ -52,11 +52,39 @@ function pantallaLogin(msg) {
     const { error } = await sb.auth.signInWithPassword({ email: email.value.trim(), password: pass.value });
     if (error) err.textContent = "Correo o contraseña incorrectos.";
     else arrancar();
-  } }, email, pass, h("button", { class: "btn full", type: "submit" }, "Entrar"), err);
+  } }, email, pass, h("button", { class: "btn full", type: "submit" }, "Entrar"), err,
+    h("button", { class: "enlace", type: "button", onclick: async ev => {
+      const em = email.value.trim();
+      if (!em) { err.textContent = "Escribe arriba tu correo y vuelve a pulsar."; return; }
+      ev.currentTarget.disabled = true; err.textContent = "Enviando…";
+      await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + location.pathname });
+      // Mensaje neutro: no se revela si el correo existe.
+      err.textContent = "Si ese correo está autorizado, te llegará un mensaje con un enlace para crear una contraseña nueva. Mira también el correo no deseado.";
+    } }, "¿Has olvidado la contraseña?"));
   $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Turno D"), h("div", { class: "sub" }, "Usera – Villaverde"), f));
 }
 
+function pantallaNuevaClave() {
+  const p1 = h("input", { type: "password", placeholder: "Contraseña nueva (mín. 8 caracteres)", autocomplete: "new-password", required: true, minlength: 8 });
+  const p2 = h("input", { type: "password", placeholder: "Repite la contraseña", autocomplete: "new-password", required: true });
+  const err = h("div", { class: "error" }, "");
+  const f = h("form", { onsubmit: async ev => {
+    ev.preventDefault();
+    if (p1.value.length < 8) { err.textContent = "Mínimo 8 caracteres."; return; }
+    if (p1.value !== p2.value) { err.textContent = "Las contraseñas no coinciden."; return; }
+    err.textContent = "Guardando…";
+    const { error } = await sb.auth.updateUser({ password: p1.value });
+    if (error) { err.textContent = "No se pudo cambiar: " + error.message; return; }
+    history.replaceState(null, "", location.pathname);
+    S.recuperando = false; arrancar();
+  } }, p1, p2, h("button", { class: "btn full", type: "submit" }, "Guardar contraseña"), err);
+  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Contraseña nueva"), h("div", { class: "sub" }, "Elige la que usarás desde ahora"), f));
+}
+S.recuperando = /type=recovery/.test(location.hash);
+sb.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") { S.recuperando = true; pantallaNuevaClave(); } });
+
 async function arrancar() {
+  if (S.recuperando) return pantallaNuevaClave();
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return pantallaLogin();
   const email = (session.user.email || "").toLowerCase();
@@ -75,6 +103,14 @@ async function arrancar() {
   S.me = S.emps.find(x => (x.email || "").toLowerCase() === email) || null;
   if (!S.me) return sinAcceso("Tu cuenta no está autorizada en Turno D. Habla con un responsable.");
   const t = new Date(); S.y = t.getFullYear(); S.m = t.getMonth(); S.sel = hoyStr();
+  const [r1, r2, pc] = await Promise.all([
+    sb.from("dias").select("fecha").order("fecha").limit(1),
+    sb.from("dias").select("fecha").order("fecha", { ascending: false }).limit(1),
+    sb.from("asignaciones").select("empleado_id,fecha").eq("codigo", "PICO"),
+  ]);
+  S.anioMin = r1.data && r1.data[0] ? +r1.data[0].fecha.slice(0, 4) : S.y;
+  S.anioMax = r2.data && r2.data[0] ? +r2.data[0].fecha.slice(0, 4) : S.y;
+  S.picos = new Set((pc.data || []).map(x => x.empleado_id + "|" + x.fecha));
   await cargarMes();
   suscribir();
   pintar();
@@ -95,6 +131,18 @@ async function cargarMes() {
   if (d.error || a.error) { toast("Error al cargar el mes"); return; }
   S.dias = Object.fromEntries(d.data.map(x => [x.fecha, x.turno]));
   S.asig = Object.fromEntries(a.data.map(x => [x.empleado_id + "|" + x.fecha, x.codigo]));
+  // Hoy y mañana también (para la recomendación de pico), aunque se esté viendo otro mes.
+  const t = new Date(), h0 = fechaStr(t.getFullYear(), t.getMonth(), t.getDate()), t2 = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1), h1 = fechaStr(t2.getFullYear(), t2.getMonth(), t2.getDate());
+  if (!(h0 >= desde && h1 <= hasta)) {
+    const [d2, a2] = await Promise.all([
+      sb.from("dias").select("fecha,turno").gte("fecha", h0).lte("fecha", h1),
+      sb.from("asignaciones").select("empleado_id,fecha,codigo").gte("fecha", h0).lte("fecha", h1),
+    ]);
+    if (!d2.error && !a2.error) {
+      for (const x of d2.data) if (!(x.fecha in S.dias)) S.dias[x.fecha] = x.turno;
+      for (const x of a2.data) { const k = x.empleado_id + "|" + x.fecha; if (!(k in S.asig)) S.asig[k] = x.codigo; }
+    }
+  }
 }
 
 function suscribir() {
@@ -105,6 +153,7 @@ function suscribir() {
       if (!r || !r.fecha) return;
       const k = r.empleado_id + "|" + r.fecha;
       if (p.eventType === "DELETE") delete S.asig[k]; else S.asig[k] = r.codigo;
+      if (S.picos) { if (p.eventType !== "DELETE" && r.codigo === "PICO") S.picos.add(k); else S.picos.delete(k); }
       if (S.vista === "cal") pintar();
     })
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "cambios" }, p => {
@@ -125,6 +174,18 @@ function enTercio(f) {
 function trabaja(empId, f) {
   const c = S.asig[empId + "|" + f];
   return !c || !!(S.cods[c] && S.cods[c].cuenta_como_trabajo);
+}
+// Último PICO de cada persona antes del día f (cadena vacía = nunca).
+function ultimoPico(empId, f) {
+  let u = "";
+  for (const k of S.picos || []) { const [id, fe] = k.split("|"); if (+id === empId && fe < f && fe > u) u = fe; }
+  return u;
+}
+// Recomendación: entre los candidatos, quien lleva más tiempo sin PICO (o nunca); a igualdad, por orden de la lista.
+function recomendarPico(f) {
+  const cand = candidatosPico(f).map(e => ({ e, u: ultimoPico(e.id, f) }));
+  cand.sort((a, b) => a.u === b.u ? a.e.orden - b.e.orden : (a.u < b.u ? -1 : 1));
+  return cand;
 }
 function candidatosPico(f) {
   // libre (sin código) y su pareja ausente
@@ -189,10 +250,50 @@ function resumenDia() {
     h("div", { class: "det" }, aus.length ? "Ausentes: " + aus.join(" · ") : "Nadie ausente.", extra.length ? h("div", {}, extra.join(" · ")) : null));
 }
 
+function bloquePico() {
+  const t = new Date(), mk = n => { const x = new Date(t.getFullYear(), t.getMonth(), t.getDate() + n); return fechaStr(x.getFullYear(), x.getMonth(), x.getDate()); };
+  const linea = (etq, f) => {
+    const tn = S.dias[f];
+    if (tn !== "M" && tn !== "T" && tn !== "N") return h("div", { class: "pl" }, h("span", { class: "pe" }, etq), h("span", { class: "pv" }, "sin servicio"));
+    const ya = S.emps.filter(e => S.asig[e.id + "|" + f] === "PICO").map(e => e.nombre);
+    if (ya.length) return h("div", { class: "pl" }, h("span", { class: "pe" }, etq), h("span", { class: "pv" }, "ya asignado: " + ya.join(", ")));
+    const r = recomendarPico(f);
+    if (!r.length) return h("div", { class: "pl" }, h("span", { class: "pe" }, etq), h("span", { class: "pv" }, "nadie candidato"));
+    return h("div", { class: "pl" }, h("span", { class: "pe" }, etq), h("span", { class: "pv" }, h("b", {}, r[0].e.nombre),
+      r.length > 1 ? h("small", {}, " · luego " + r.slice(1).map(x => x.e.nombre).join(", ")) : null));
+  };
+  const lineas = [linea("Hoy", mk(0)), linea("Mañana", mk(1))];
+  if (S.sel !== mk(0) && S.sel !== mk(1)) lineas.push(linea(fechaCorta(S.sel), S.sel));
+  return h("div", { class: "picoreco" }, h("div", { class: "pt" }, "Pico recomendado"), lineas,
+    h("small", { class: "det" }, "Candidatos: libres con la pareja ausente. Va primero quien lleva más tiempo sin pico."));
+}
+
+// Selector directo de mes y año
+function abrirSelectorMes(irA) {
+  let anio = S.y;
+  const dlg = h("dialog", {});
+  const cont = h("div", {});
+  const dibujar = () => {
+    cont.replaceChildren(
+      h("div", { class: "anio" }, h("button", { disabled: anio <= S.anioMin, onclick: () => { anio--; dibujar(); } }, "‹"), h("b", {}, anio),
+        h("button", { disabled: anio >= S.anioMax, onclick: () => { anio++; dibujar(); } }, "›")),
+      h("div", { class: "meses" }, MESES.map((n, i) => h("button", { class: "mesb" + (anio === S.y && i === S.m ? " act" : ""), onclick: () => { dlg.close(); irA(anio, i); } }, n.slice(0, 3)))));
+  };
+  dibujar();
+  dlg.append(h("h3", {}, "Ir a un mes"), cont, h("div", { class: "fila" }, h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cerrar")));
+  dlg.addEventListener("close", () => dlg.remove());
+  document.body.append(dlg); dlg.showModal();
+}
+
 function vistaCalendario() {
   const nd = new Date(S.y, S.m + 1, 0).getDate(), hoy = hoyStr();
   const dias = Array.from({ length: nd }, (_, i) => i + 1);
   const cls = (d, f) => [new Date(S.y, S.m, d).getDay() % 6 === 0 ? "finde" : "", f === hoy ? "hoy" : "", f === S.sel ? "sel" : ""].join(" ");
+  const irAMes = async (y, m) => {
+    S.y = y; S.m = m; const h0 = hoyStr();
+    S.sel = h0.startsWith(`${S.y}-${pad(S.m + 1)}`) ? h0 : fechaStr(S.y, S.m, 1);
+    S.yaScroll = false; await cargarMes(); pintar();
+  };
   const irMes = async (dm, aHoy) => {
     if (aHoy) { const t = new Date(); S.y = t.getFullYear(); S.m = t.getMonth(); }
     else { S.m += dm; if (S.m < 0) { S.m = 11; S.y--; } if (S.m > 11) { S.m = 0; S.y++; } }
@@ -228,9 +329,10 @@ function vistaCalendario() {
     return h("td", { class: n < S.minimo ? "bajo" : "ok" }, n);
   })));
   return h("div", {},
-    h("div", { class: "mes" }, h("button", { onclick: () => irMes(-1) }, "‹"), h("b", {}, `${MESES[S.m]} ${S.y}`), h("button", { onclick: () => irMes(1) }, "›"),
+    h("div", { class: "mes" }, h("button", { onclick: () => irMes(-1) }, "‹"), h("b", { class: "mesSel", title: "Elegir mes y año", onclick: () => abrirSelectorMes(irAMes) }, `${MESES[S.m]} ${S.y} ▾`), h("button", { onclick: () => irMes(1) }, "›"),
       h("button", { class: "hoybtn", onclick: () => irMes(0, true) }, "Hoy")),
     h("div", { class: "resumen" }, resumenDia()),
+    bloquePico(),
     h("div", { style: "height:.7rem" }),
     h("div", { class: "wrap" }, h("table", { class: "cal" + (S.fsel ? " conSel" : "") }, thead, tbody, tfoot)),
     h("div", { class: "leyenda" }, h("span", { class: "a" }, "Vacaciones y permisos"), h("span", { class: "t" }, "Trabajo"), h("span", { class: "m" }, "Modificadores (PICO, DESP)"), h("span", { class: "e" }, "Otros"), h("span", { class: "l" }, "Día libre (L)"),
@@ -291,6 +393,7 @@ async function guardar(emp, f, codigo) {
     toast("No se pudo guardar: " + error.message, 6000); return;
   }
   if (codigo) S.asig[k] = codigo; else delete S.asig[k];
+  if (S.picos) { if (codigo === "PICO") S.picos.add(k); else S.picos.delete(k); }
   pintar();
 }
 

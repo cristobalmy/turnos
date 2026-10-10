@@ -167,3 +167,20 @@ dialog input:disabled{opacity:.45}
 
 /* ---- días pasados: solo lectura (salvo administrador) ---- */
 .cal td.pasado{cursor:not-allowed}
+
+/* selector de mes, pico recomendado, enlace de contraseña */
+.mes b.mesSel{cursor:pointer;border-bottom:1px dashed var(--borde)}
+.anio{display:flex;align-items:center;justify-content:center;gap:1rem;margin:.4rem 0 .8rem;font-size:1.1rem}
+.anio button{background:var(--card);border:1px solid var(--borde);border-radius:8px;padding:.3rem .85rem;cursor:pointer;font-size:1.1rem;color:inherit}
+.anio button:disabled{opacity:.35;cursor:default}
+.meses{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:.8rem}
+.mesb{padding:.7rem 0;border:1px solid var(--borde);border-radius:8px;background:var(--card);color:inherit;text-transform:capitalize;font-size:1rem;cursor:pointer}
+.mesb.act{background:#2563b8;color:#fff;border-color:#2563b8}
+.picoreco{margin:.6rem .75rem 0;padding:.6rem .8rem;background:var(--card);border:1px solid var(--borde);border-radius:10px;font-size:.92rem}
+.picoreco .pt{font-weight:700;margin-bottom:.3rem}
+.picoreco .pl{display:flex;gap:.6rem;padding:.12rem 0}
+.picoreco .pe{min-width:4.2em;color:var(--suave,#667)}
+.picoreco small{color:var(--suave,#667)}
+.picoreco .det{display:block;margin-top:.35rem}
+.enlace{background:none;border:0;color:#2563b8;text-decoration:underline;margin-top:.8rem;font-size:.9rem;cursor:pointer;display:block;width:100%}
+.enlace:disabled{opacity:.5}
