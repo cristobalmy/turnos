@@ -148,7 +148,7 @@ input{background:var(--card);color:var(--txt)}
 .fila-f{display:flex;align-items:baseline;gap:.6rem;padding:.5rem 0;border-top:1px solid var(--linea)}
 .fila-f.edit{cursor:pointer}.fila-f.edit:hover{background:var(--hov)}
 .fnom{flex:1;min-width:0;overflow-wrap:anywhere}.ffecha{color:var(--suave);font-size:.85rem;white-space:nowrap}
-.ftipo{font-size:.72rem;font-weight:700;border-radius:6px;padding:1px 6px;white-space:nowrap}
+.ftipo{font-size:.72rem;font-weight:700;border-radius:6px;padding:2px 0;white-space:nowrap;display:inline-block;width:6.6em;text-align:center;flex:none}
 .ftipo.for{background:var(--aus);color:var(--aus-t)}.ftipo.hab{background:var(--trab);color:var(--trab-t)}
 .vacio{color:var(--suave);padding:.5rem 0;font-size:.9rem}
 dialog label{display:block;font-size:.85rem;color:var(--suave);margin-top:.7rem}
