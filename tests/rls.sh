@@ -12,6 +12,7 @@ $P -f supabase/schema.sql
 $P -f supabase/seed.sql
 $P -f supabase/migracion_001_pico.sql >/dev/null
 sed -e '/create extension/d' -e "s/__SECRETO__/secreto-de-prueba/" supabase/migracion_002_avisos.sql | $P >/dev/null
+$P -f supabase/migracion_003_formaciones.sql >/dev/null
 $P -f tests/after_schema.sql
 $P -f tests/rls_scenarios.sql 2>&1 | grep -E "^(==|NOTICE|psql|ERROR)" | sed 's/^NOTICE:  //' | tee /tmp/rls_out.txt
 ! grep -q FALLO /tmp/rls_out.txt && echo "TODO CORRECTO" || { echo "HAY FALLOS"; exit 1; }

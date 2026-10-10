@@ -135,3 +135,21 @@ input{background:var(--card);color:var(--txt)}
 .cal tfoot tr:first-child th,.cal tfoot tr:first-child td{bottom:39px;border-top:2px solid var(--borde)}
 .cal tfoot tr:last-child th,.cal tfoot tr:last-child td{border-top:1px solid var(--linea)}
 .pag .sub{color:var(--suave);font-size:.9rem;margin:.2rem 0 .5rem}
+
+/* ---- formaciones y habilitaciones ---- */
+.form-pag{max-width:760px;margin:1rem auto;padding:0 .8rem}
+.form-pag h2{margin:.2rem 0}.form-pag .sub{color:var(--suave);font-size:.9rem;margin:.2rem 0 .7rem}
+.form-pag input[type=search]{width:100%;padding:.65rem .8rem;border:1px solid var(--borde);border-radius:10px;background:var(--card);color:var(--txt);margin-bottom:.8rem}
+.fpers{background:var(--card);border:1px solid var(--borde);border-radius:12px;padding:.3rem .8rem .5rem;margin-bottom:.7rem}
+.fpers.yo{border-color:var(--azul2)}
+.fcab{display:flex;align-items:center;gap:.5rem;padding:.4rem 0}.fcab b{flex:1}
+.fn{background:var(--gris);border-radius:999px;padding:0 .55rem;font-size:.8rem;color:var(--suave)}
+.btn.mini{padding:.25rem .65rem;font-size:.85rem;border-radius:8px}
+.fila-f{display:flex;align-items:baseline;gap:.6rem;padding:.5rem 0;border-top:1px solid var(--linea)}
+.fila-f.edit{cursor:pointer}.fila-f.edit:hover{background:var(--hov)}
+.fnom{flex:1;min-width:0;overflow-wrap:anywhere}.ffecha{color:var(--suave);font-size:.85rem;white-space:nowrap}
+.ftipo{font-size:.72rem;font-weight:700;border-radius:6px;padding:1px 6px;white-space:nowrap}
+.ftipo.for{background:var(--aus);color:var(--aus-t)}.ftipo.hab{background:var(--trab);color:var(--trab-t)}
+.vacio{color:var(--suave);padding:.5rem 0;font-size:.9rem}
+dialog label{display:block;font-size:.85rem;color:var(--suave);margin-top:.7rem}
+dialog label input,dialog label select{display:block;width:100%;margin-top:.25rem;padding:.6rem;border:1px solid var(--borde);border-radius:10px;background:var(--card);color:var(--txt)}

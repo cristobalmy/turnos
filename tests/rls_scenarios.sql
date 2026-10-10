@@ -68,6 +68,28 @@ begin; insert into asignaciones(empleado_id,fecha,codigo) values (4,'2026-11-05'
 select pg_temp.chk((select count(*) from net.llamadas) = 0, 'un cambio desde el panel de Supabase no genera aviso');
 rollback;
 
+\echo == Formaciones y habilitaciones
+begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
+select pg_temp.chk(not pg_temp.falla($$insert into formaciones(empleado_id,tipo,nombre,fecha) values (4,'Habilitación','Conducción de motocicleta policial Ñ','2026-03-02')$$), 'puede apuntar una suya (con ñ y tildes)');
+select pg_temp.chk((select nombre from formaciones where empleado_id=4) = 'Conducción de motocicleta policial Ñ', 'las ñ y las tildes se guardan tal cual');
+select pg_temp.chk(pg_temp.falla($$insert into formaciones(empleado_id,tipo,nombre,fecha) values (3,'Formación','Tiro','2026-03-02')$$), 'NO puede apuntar una a otra persona');
+select pg_temp.chk(pg_temp.falla($$insert into formaciones(empleado_id,tipo,nombre,fecha) values (4,'Otra','Tiro','2026-03-02')$$), 'solo vale Formación o Habilitación');
+select pg_temp.chk(pg_temp.falla($$insert into formaciones(empleado_id,tipo,nombre,fecha) values (4,'Formación','   ','2026-03-02')$$), 'el nombre no puede estar vacío');
+select pg_temp.chk(pg_temp.filas($$update formaciones set fecha='2026-03-03' where empleado_id=4$$) = 1, 'puede corregir la fecha de la suya');
+select pg_temp.chk(pg_temp.falla($$update formaciones set empleado_id=3 where empleado_id=4$$), 'NO puede pasarla a otra persona');
+rollback;
+begin; insert into formaciones(empleado_id,tipo,nombre,fecha) values (4,'Formación','Primeros auxilios','2026-01-10');
+set local role authenticated; select set_config('request.jwt.claims','{"email":"alfonso@t.es"}',true);
+select pg_temp.chk((select count(*) from formaciones) = 0, 'una cuenta no autorizada no ve nada');
+select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
+select pg_temp.chk(pg_temp.filas($$delete from formaciones where empleado_id=4$$) = 1, 'puede borrar la suya');
+rollback;
+begin; insert into formaciones(empleado_id,tipo,nombre,fecha) values (4,'Formación','Primeros auxilios','2026-01-10');
+set local role authenticated; select set_config('request.jwt.claims','{"email":"nacho@t.es"}',true);
+select pg_temp.chk((select count(*) from formaciones) = 1, 'todo el equipo ve las de los demás');
+select pg_temp.chk(pg_temp.filas($$update formaciones set nombre='Primeros auxilios II' where empleado_id=4$$) = 1, 'un responsable puede editar las de otros');
+rollback;
+
 \echo == Responsable (Nacho, id 3)
 begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"NACHO@t.es"}',true);
 select pg_temp.chk(not pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values (4,'2026-11-02','PICO')$$), 'puede poner PICO a otra persona (el email no distingue mayúsculas)');

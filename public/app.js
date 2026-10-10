@@ -141,6 +141,7 @@ function candidatosPico(f) {
 const ICON = {
   cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   hist: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/>',
+  form: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c0 1 3 3 6 3s6-2 6-3v-5"/>',
   cuenta: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
 };
 const icono = k => { const s = document.createElement("span"); s.innerHTML = `<svg viewBox="0 0 24 24">${ICON[k]}</svg>`; return s.firstChild; };
@@ -152,13 +153,13 @@ function cabecera() {
   const b = (v, txt) => h("button", { class: S.vista === v ? "on" : "", onclick: () => { S.vista = v; pintar(); } }, icono(v), txt);
   return h("header", {},
     h("div", { class: "marca" }, h("i", {}, "D"), "Turno D"),
-    h("nav", { class: "tabs" }, b("cal", "Calendario"), b("hist", "Cambios"), b("cuenta", "Cuenta")),
+    h("nav", { class: "tabs" }, b("cal", "Calendario"), b("hist", "Cambios"), b("form", "Formación"), b("cuenta", "Cuenta")),
     h("span", { class: "yo" }, S.me.nombre));
 }
 function pintar() {
   const w = $app.querySelector(".wrap");
   const pos = w ? [w.scrollLeft, w.scrollTop] : null;
-  const cuerpo = S.vista === "cal" ? vistaCalendario() : S.vista === "hist" ? vistaHistorial() : vistaCuenta();
+  const cuerpo = S.vista === "cal" ? vistaCalendario() : S.vista === "hist" ? vistaHistorial() : S.vista === "form" ? vistaFormacion() : vistaCuenta();
   $app.replaceChildren(cabecera(), cuerpo);
   if (S.vista !== "cal") return;
   const nw = $app.querySelector(".wrap");
@@ -287,6 +288,77 @@ function vistaHistorial() {
     }) : [h("li", {}, "Todavía no hay cambios.")]));
   });
   return h("div", { class: "pag" }, h("h2", {}, "Últimos cambios"), ul);
+}
+
+// ---------- formaciones y habilitaciones ----------
+const fechaLarga = f => { const [y, m, d] = f.split("-"); return `${d}/${m}/${y}`; };
+async function cargarForms() {
+  const { data, error } = await sb.from("formaciones").select("*").order("fecha", { ascending: false });
+  if (error) { toast("No se pudieron cargar las formaciones: " + error.message, 6000); return; }
+  S.forms = data;
+}
+
+function editarFormacion(emp, item) {
+  const dlg = h("dialog", {});
+  const tipo = h("select", {}, ["Formación", "Habilitación"].map(t => h("option", { value: t, selected: item && item.tipo === t }, t)));
+  const nombre = h("input", { type: "text", maxlength: "150", placeholder: "Ej.: Conducción de motocicleta, Primeros auxilios…", value: item ? item.nombre : "" });
+  const fecha = h("input", { type: "date", value: item ? item.fecha : hoyStr() });
+  const err = h("div", { class: "error" });
+  const guardarF = async ev => {
+    const n = nombre.value.trim();
+    if (!n) { err.textContent = "Escribe el nombre."; return; }
+    if (!fecha.value) { err.textContent = "Indica la fecha en que se hizo."; return; }
+    ev.target.disabled = true;
+    const fila = { empleado_id: emp.id, tipo: tipo.value, nombre: n, fecha: fecha.value };
+    const { error } = item ? await sb.from("formaciones").update(fila).eq("id", item.id) : await sb.from("formaciones").insert(fila);
+    if (error) { ev.target.disabled = false; err.textContent = "No se pudo guardar: " + error.message; return; }
+    await cargarForms(); dlg.close();
+  };
+  dlg.append(
+    h("h3", {}, item ? "Editar" : "Añadir"), h("p", { class: "sub" }, emp.nombre),
+    h("label", {}, "Tipo", tipo), h("label", {}, "Nombre", nombre), h("label", {}, "Fecha en que se hizo", fecha), err,
+    h("div", { class: "fila" },
+      item ? h("button", { class: "btn sec", onclick: async ev => {
+        if (!confirm("¿Borrar «" + item.nombre + "»?")) return;
+        ev.target.disabled = true;
+        const { error } = await sb.from("formaciones").delete().eq("id", item.id);
+        if (error) { ev.target.disabled = false; err.textContent = "No se pudo borrar: " + error.message; return; }
+        await cargarForms(); dlg.close();
+      } }, "Borrar") : h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cancelar"),
+      h("button", { class: "btn", onclick: guardarF }, "Guardar")));
+  dlg.addEventListener("close", () => { dlg.remove(); pintar(); });
+  document.body.append(dlg); dlg.showModal(); nombre.focus();
+}
+
+function vistaFormacion() {
+  const cont = h("div", { class: "form-pag" });
+  const lista = h("div", {});
+  const buscar = h("input", { type: "search", placeholder: "Buscar una formación o a una persona…", value: S.fq || "" });
+  const pintarLista = () => {
+    const q = (buscar.value || "").trim().toLowerCase();
+    S.fq = buscar.value;
+    const orden = [S.me, ...S.emps.filter(e => e.id !== S.me.id)];
+    const bloques = orden.map(e => {
+      const todas = (S.forms || []).filter(f => f.empleado_id === e.id);
+      const coincideNombre = q && e.nombre.toLowerCase().includes(q);
+      const items = q && !coincideNombre ? todas.filter(f => f.nombre.toLowerCase().includes(q) || f.tipo.toLowerCase().includes(q)) : todas;
+      if (q && !items.length) return null;
+      const puede = esResp() || e.id === S.me.id;
+      return h("section", { class: "fpers" + (e.id === S.me.id ? " yo" : "") },
+        h("div", { class: "fcab" }, h("b", {}, e.id === S.me.id ? e.nombre + " (tú)" : e.nombre), h("span", { class: "fn" }, String(todas.length)),
+          puede ? h("button", { class: "btn mini", onclick: () => editarFormacion(e, null) }, "+ Añadir") : null),
+        items.length ? items.map(f => h("div", { class: "fila-f" + (puede ? " edit" : ""), onclick: puede ? () => editarFormacion(e, f) : null },
+          h("span", { class: "ftipo " + (f.tipo === "Habilitación" ? "hab" : "for") }, f.tipo),
+          h("span", { class: "fnom" }, f.nombre), h("span", { class: "ffecha" }, fechaLarga(f.fecha))))
+          : h("div", { class: "vacio" }, e.id === S.me.id ? "Aún no has añadido ninguna. Pulsa «+ Añadir»." : "Sin registros"));
+    }).filter(Boolean);
+    lista.replaceChildren(...(bloques.length ? bloques : [h("div", { class: "vacio" }, "Nada coincide con la búsqueda.")]));
+  };
+  buscar.addEventListener("input", pintarLista);
+  cont.append(h("h2", {}, "Formaciones y habilitaciones"), h("p", { class: "sub" }, esResp() ? "Cada uno puede editar las suyas; como responsable puedes editar las de todos." : "Puedes añadir, corregir o borrar las tuyas. Las de los compañeros son solo de lectura."), buscar, lista);
+  if (S.forms) pintarLista(); else { lista.append(h("div", { class: "vacio" }, "Cargando…")); cargarForms().then(pintarLista); }
+  if (S.forms) cargarForms().then(pintarLista);
+  return cont;
 }
 
 // ---------- avisos al móvil (push) ----------

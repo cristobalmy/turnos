@@ -19,6 +19,9 @@ App web instalable (PWA) para el equipo. Supabase (base de datos + acceso) + Ver
 ## Pruebas
 `bash tests/rls.sh` levanta un Postgres local desechable y comprueba esquema, importación y permisos.
 
+## Formaciones y habilitaciones
+Ejecutar `supabase/migracion_003_formaciones.sql` en el SQL Editor (crea la tabla y sus permisos).
+
 ## Avisos al móvil (opcional)
 1. Supabase → Edge Functions → *Deploy a new function* → *Via Editor*, nombre `avisar`, pegar `supabase/functions/avisar/index.ts`. Desactivar *Verify JWT*.
 2. Edge Functions → Secrets: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (`mailto:tu@correo`) y `AVISO_SECRET`.
