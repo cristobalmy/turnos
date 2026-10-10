@@ -821,7 +821,7 @@ function vistaInformes() {
         codigos.length ? tarjetas : h("p", { class: "det" }, "Todavía no hay días apuntados.")),
       h("div", { class: "pag ancho" },
         h("h2", {}, "Reparto de picos"), h("p", { class: "sub" }, "Picos ya hechos este año, de más a menos."),
-        h("table", { class: "ipicos" }, h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Picos"), h("th", {}, "Desp."), h("th", {}, "Último pico"))),
+        h("table", { class: "ipicos" }, h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Picos"), h("th", {}, "Desplazado"), h("th", {}, "Último pico"))),
           h("tbody", {}, picosEmp.map(x => h("tr", {}, h("td", {}, x.e.nombre), h("td", {}, h("b", {}, x.n)), h("td", {}, x.d), h("td", {}, x.ult ? fechaLarga(x.ult) : "–"))))),
         null));
   };

@@ -256,3 +256,4 @@ table.res .rnota td{font-size:.75rem;color:var(--suave);text-align:left}
   #imprimir td.pbajo{background:#fbd5d0;color:#c0392b;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   #imprimir thead th,#imprimir tbody th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+.ipicos th{font-size:.7rem}
