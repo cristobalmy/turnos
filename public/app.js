@@ -163,6 +163,19 @@ async function cargarMes() {
   }
 }
 
+// Al volver a la app (móvil dormido, pestaña olvidada, cambio de día) se recargan los datos para no enseñar nada viejo.
+S.ultimaCarga = Date.now(); S.diaCarga = hoyStr();
+async function refrescar() {
+  if (!S.me || document.hidden) return;
+  const cambioDia = hoyStr() !== S.diaCarga;
+  if (!cambioDia && Date.now() - S.ultimaCarga < 5 * 60 * 1000) return;
+  S.ultimaCarga = Date.now(); S.diaCarga = hoyStr();
+  if (cambioDia) { const t = new Date(); S.y = t.getFullYear(); S.m = t.getMonth(); S.sel = hoyStr(); S.yaScroll = false; }
+  await Promise.all([cargarMes(), cargarResumen()]);
+  if (S.vista === "cal" || S.vista === "res") pintar();
+}
+document.addEventListener("visibilitychange", refrescar);
+
 function suscribir() {
   if (S.canal) return;
   S.canal = sb.channel("turnos")
