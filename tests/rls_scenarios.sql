@@ -68,26 +68,28 @@ begin; insert into asignaciones(empleado_id,fecha,codigo) values (4,'2026-11-05'
 select pg_temp.chk((select count(*) from net.llamadas) = 0, 'un cambio desde el panel de Supabase no genera aviso');
 rollback;
 
-\echo == Formaciones y habilitaciones
+\echo == Cursos y habilitaciones (lista cerrada)
+select pg_temp.chk((select count(*) from cursos) = 11 and (select count(*) from cursos where tipo='Habilitación') = 3, 'la lista tiene 11 cursos, 3 de ellos habilitaciones');
 begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
-select pg_temp.chk(not pg_temp.falla($$insert into formaciones(empleado_id,tipo,nombre,fecha) values (4,'Habilitación','Conducción de motocicleta policial Ñ','2026-03-02')$$), 'puede apuntar una suya (con ñ y tildes)');
-select pg_temp.chk((select nombre from formaciones where empleado_id=4) = 'Conducción de motocicleta policial Ñ', 'las ñ y las tildes se guardan tal cual');
-select pg_temp.chk(pg_temp.falla($$insert into formaciones(empleado_id,tipo,nombre,fecha) values (3,'Formación','Tiro','2026-03-02')$$), 'NO puede apuntar una a otra persona');
-select pg_temp.chk(pg_temp.falla($$insert into formaciones(empleado_id,tipo,nombre,fecha) values (4,'Otra','Tiro','2026-03-02')$$), 'solo vale Formación o Habilitación');
-select pg_temp.chk(pg_temp.falla($$insert into formaciones(empleado_id,tipo,nombre,fecha) values (4,'Formación','   ','2026-03-02')$$), 'el nombre no puede estar vacío');
+select pg_temp.chk(not pg_temp.falla($$insert into formaciones(empleado_id,nombre,fecha) values (4,'Intervención vehículos','2026-03-02')$$), 'puede apuntar un curso de la lista (con tildes)');
+select pg_temp.chk((select nombre from formaciones where empleado_id=4) = 'Intervención vehículos', 'las tildes se guardan tal cual');
+select pg_temp.chk(pg_temp.falla($$insert into formaciones(empleado_id,nombre,fecha) values (4,'Curso inventado','2026-03-02')$$), 'NO puede apuntar un curso que no está en la lista');
+select pg_temp.chk(pg_temp.falla($$insert into formaciones(empleado_id,nombre,fecha) values (3,'TAIP','2026-03-02')$$), 'NO puede apuntar uno a otra persona');
 select pg_temp.chk(pg_temp.filas($$update formaciones set fecha='2026-03-03' where empleado_id=4$$) = 1, 'puede corregir la fecha de la suya');
 select pg_temp.chk(pg_temp.falla($$update formaciones set empleado_id=3 where empleado_id=4$$), 'NO puede pasarla a otra persona');
+select pg_temp.chk(pg_temp.falla($$insert into cursos(nombre,tipo,orden) values ('Nuevo','Formación',99)$$), 'un agente NO puede cambiar la lista de cursos');
 rollback;
-begin; insert into formaciones(empleado_id,tipo,nombre,fecha) values (4,'Formación','Primeros auxilios','2026-01-10');
+begin; insert into formaciones(empleado_id,nombre,fecha) values (4,'TAIP','2026-01-10');
 set local role authenticated; select set_config('request.jwt.claims','{"email":"alfonso@t.es"}',true);
-select pg_temp.chk((select count(*) from formaciones) = 0, 'una cuenta no autorizada no ve nada');
+select pg_temp.chk((select count(*) from formaciones) = 0 and (select count(*) from cursos) = 0, 'una cuenta no autorizada no ve nada');
 select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
 select pg_temp.chk(pg_temp.filas($$delete from formaciones where empleado_id=4$$) = 1, 'puede borrar la suya');
 rollback;
-begin; insert into formaciones(empleado_id,tipo,nombre,fecha) values (4,'Formación','Primeros auxilios','2026-01-10');
+begin; insert into formaciones(empleado_id,nombre,fecha) values (4,'TAIP','2026-01-10');
 set local role authenticated; select set_config('request.jwt.claims','{"email":"nacho@t.es"}',true);
 select pg_temp.chk((select count(*) from formaciones) = 1, 'todo el equipo ve las de los demás');
-select pg_temp.chk(pg_temp.filas($$update formaciones set nombre='Primeros auxilios II' where empleado_id=4$$) = 1, 'un responsable puede editar las de otros');
+select pg_temp.chk(pg_temp.filas($$update formaciones set nombre='TAU 1' where empleado_id=4$$) = 1, 'un responsable puede editar las de otros');
+select pg_temp.chk(not pg_temp.falla($$insert into cursos(nombre,tipo,orden) values ('Nuevo','Formación',99)$$), 'un responsable puede ampliar la lista');
 rollback;
 
 \echo == Responsable (Nacho, id 3)

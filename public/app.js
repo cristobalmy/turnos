@@ -292,6 +292,11 @@ function vistaHistorial() {
 
 // ---------- formaciones y habilitaciones ----------
 const fechaLarga = f => { const [y, m, d] = f.split("-"); return `${d}/${m}/${y}`; };
+async function cargarCursos() {
+  const { data, error } = await sb.from("cursos").select("*").order("orden");
+  S.cursos = error ? [] : data;
+}
+const tipoDe = nombre => { const c = (S.cursos || []).find(x => x.nombre === nombre); return c ? c.tipo : "Formación"; };
 async function cargarForms() {
   const { data, error } = await sb.from("formaciones").select("*").order("fecha", { ascending: false });
   if (error) { toast("No se pudieron cargar las formaciones: " + error.message, 6000); return; }
@@ -300,23 +305,27 @@ async function cargarForms() {
 
 function editarFormacion(emp, item) {
   const dlg = h("dialog", {});
-  const tipo = h("select", {}, ["Formación", "Habilitación"].map(t => h("option", { value: t, selected: item && item.tipo === t }, t)));
-  const nombre = h("input", { type: "text", maxlength: "150", placeholder: "Ej.: Conducción de motocicleta, Primeros auxilios…", value: item ? item.nombre : "" });
+  const cursos = S.cursos || [];
+  const grupo = (titulo, t) => h("optgroup", { label: titulo }, cursos.filter(c => c.tipo === t).map(c => h("option", { value: c.nombre, selected: item && item.nombre === c.nombre }, c.nombre)));
+  const fuera = item && !cursos.some(c => c.nombre === item.nombre);   // registro antiguo que no está en la lista
+  const nombre = h("select", {}, !item ? h("option", { value: "" }, "— Elige —") : null,
+    fuera ? h("option", { value: item.nombre, selected: true }, item.nombre + " (ya no está en la lista)") : null,
+    grupo("Habilitaciones", "Habilitación"), grupo("Formaciones", "Formación"));
   const fecha = h("input", { type: "date", value: item ? item.fecha : hoyStr() });
   const err = h("div", { class: "error" });
   const guardarF = async ev => {
-    const n = nombre.value.trim();
-    if (!n) { err.textContent = "Escribe el nombre."; return; }
+    const n = nombre.value;
+    if (!n) { err.textContent = "Elige el curso."; return; }
     if (!fecha.value) { err.textContent = "Indica la fecha en que se hizo."; return; }
     ev.target.disabled = true;
-    const fila = { empleado_id: emp.id, tipo: tipo.value, nombre: n, fecha: fecha.value };
+    const fila = { empleado_id: emp.id, nombre: n, fecha: fecha.value };
     const { error } = item ? await sb.from("formaciones").update(fila).eq("id", item.id) : await sb.from("formaciones").insert(fila);
     if (error) { ev.target.disabled = false; err.textContent = "No se pudo guardar: " + error.message; return; }
     await cargarForms(); dlg.close();
   };
   dlg.append(
     h("h3", {}, item ? "Editar" : "Añadir"), h("p", { class: "sub" }, emp.nombre),
-    h("label", {}, "Tipo", tipo), h("label", {}, "Nombre", nombre), h("label", {}, "Fecha en que se hizo", fecha), err,
+    h("label", {}, "Curso o habilitación", nombre), h("label", {}, "Fecha en que se hizo", fecha), err,
     h("div", { class: "fila" },
       item ? h("button", { class: "btn sec", onclick: async ev => {
         if (!confirm("¿Borrar «" + item.nombre + "»?")) return;
@@ -341,14 +350,14 @@ function vistaFormacion() {
     const bloques = orden.map(e => {
       const todas = (S.forms || []).filter(f => f.empleado_id === e.id);
       const coincideNombre = q && e.nombre.toLowerCase().includes(q);
-      const items = q && !coincideNombre ? todas.filter(f => f.nombre.toLowerCase().includes(q) || f.tipo.toLowerCase().includes(q)) : todas;
+      const items = q && !coincideNombre ? todas.filter(f => f.nombre.toLowerCase().includes(q) || tipoDe(f.nombre).toLowerCase().includes(q)) : todas;
       if (q && !items.length) return null;
       const puede = esResp() || e.id === S.me.id;
       return h("section", { class: "fpers" + (e.id === S.me.id ? " yo" : "") },
         h("div", { class: "fcab" }, h("b", {}, e.id === S.me.id ? e.nombre + " (tú)" : e.nombre), h("span", { class: "fn" }, String(todas.length)),
           puede ? h("button", { class: "btn mini", onclick: () => editarFormacion(e, null) }, "+ Añadir") : null),
         items.length ? items.map(f => h("div", { class: "fila-f" + (puede ? " edit" : ""), onclick: puede ? () => editarFormacion(e, f) : null },
-          h("span", { class: "ftipo " + (f.tipo === "Habilitación" ? "hab" : "for") }, f.tipo),
+          h("span", { class: "ftipo " + (tipoDe(f.nombre) === "Habilitación" ? "hab" : "for") }, tipoDe(f.nombre)),
           h("span", { class: "fnom" }, f.nombre), h("span", { class: "ffecha" }, fechaLarga(f.fecha))))
           : h("div", { class: "vacio" }, e.id === S.me.id ? "Aún no has añadido ninguna. Pulsa «+ Añadir»." : "Sin registros"));
     }).filter(Boolean);
@@ -356,8 +365,9 @@ function vistaFormacion() {
   };
   buscar.addEventListener("input", pintarLista);
   cont.append(h("h2", {}, "Formaciones y habilitaciones"), h("p", { class: "sub" }, esResp() ? "Cada uno puede editar las suyas; como responsable puedes editar las de todos." : "Puedes añadir, corregir o borrar las tuyas. Las de los compañeros son solo de lectura."), buscar, lista);
-  if (S.forms) pintarLista(); else { lista.append(h("div", { class: "vacio" }, "Cargando…")); cargarForms().then(pintarLista); }
-  if (S.forms) cargarForms().then(pintarLista);
+  const cargar = () => Promise.all([cargarCursos(), cargarForms()]).then(pintarLista);
+  if (S.forms && S.cursos) pintarLista(); else lista.append(h("div", { class: "vacio" }, "Cargando…"));
+  cargar();
   return cont;
 }
 
