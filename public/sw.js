@@ -1,5 +1,5 @@
 // Service worker: guarda la "cáscara" de la app para abrirla rápido y muestra los avisos push.
-const V = "turnos-v10";
+const V = "turnos-v11";
 const SHELL = ["./", "index.html", "app.js", "style.css", "config.js", "icon.svg", "icon-192.png", "manifest.webmanifest"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(V).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener("activate", e => {

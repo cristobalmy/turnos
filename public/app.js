@@ -352,9 +352,9 @@ function panelBloque(titulo, k, clase) {
         if (f < hoy) return h("td", {}, "–");
         const ya = S.emps.filter(e => R.asig[e.id + "|" + f] === "PICO").map(e => e.nombre);
         if (ya.length) return h("td", {}, h("small", {}, "asignado"), h("div", {}, ya.join(", ")));
-        if (!hacePicoFalta(f, R.asig)) return h("td", {}, h("small", {}, "no hace falta"));
+        if (!hacePicoFalta(f, R.asig)) return h("td", {}, "–");
         const r = recomendarPico(f, R.asig);
-        return h("td", {}, r.length ? [h("small", {}, "recomendado"), h("div", {}, h("b", {}, r[0].e.nombre))] : h("small", {}, "nadie"));
+        return h("td", {}, r.length ? h("b", {}, r[0].e.nombre) : h("small", {}, "nadie"));
       }),
       fila("Personal activo", "rl", f => h("td", {}, h("ul", {}, S.emps.filter(e => trabajaR(e.id, f)).map(e => persona(e, f))))),
       fila("Ausencias", "rl", f => h("td", {}, h("ul", {}, S.emps.filter(e => !trabajaR(e.id, f)).map(e => persona(e, f))))),
@@ -495,7 +495,7 @@ function abrirEdicion(emp, f) {
   const [y, m, d] = f.split("-").map(Number);
   const elegir = async (codigo, btn) => { btn.disabled = true; await guardar(emp, f, codigo); dlg.close(); };
   const secciones = GRUPOS.map(([tipo, titulo]) => {
-    const lista = Object.values(S.cods).filter(c => grupoDe(c.codigo) === tipo && (esResp() || !c.solo_responsables) && !(c.codigo === "PICO" && emp.hace_pico === false));
+    const lista = Object.values(S.cods).filter(c => !c.oculto && grupoDe(c.codigo) === tipo && (esResp() || !c.solo_responsables) && !(c.codigo === "PICO" && emp.hace_pico === false));
     if (!lista.length) return null;
     return [h("h4", {}, titulo), h("div", { class: "chips" }, lista.map(c =>
       h("button", { class: `chip ${claseTipo(c.codigo)} ${c.codigo === actual ? "act" : ""}`, onclick: ev => elegir(c.codigo, ev.currentTarget) },
@@ -698,7 +698,7 @@ function vistaInformes() {
     const propias = rows.filter(r => r.empleado_id === S.infEmp);
     const porCodigo = {};
     for (const r of propias) (porCodigo[r.codigo] = porCodigo[r.codigo] || []).push(r.fecha);
-    const codigos = Object.keys(porCodigo).sort((a, b) => (S.cods[a] ? S.cods[a].orden : 99) - (S.cods[b] ? S.cods[b].orden : 99));
+    const codigos = Object.keys(porCodigo).filter(c => !(S.cods[c] && S.cods[c].oculto)).sort((a, b) => (S.cods[a] ? S.cods[a].orden : 99) - (S.cods[b] ? S.cods[b].orden : 99));
     const totAus = propias.filter(r => esAus(r.codigo)).length, totVac = propias.filter(r => esVac(r.codigo)).length;
     const tarjetas = GRUPOS.map(([g, titulo]) => {
       const cs = codigos.filter(c => grupoDe(c) === g); if (!cs.length) return null;
@@ -711,7 +711,6 @@ function vistaInformes() {
       const mios = rows.filter(r => r.empleado_id === e.id && r.codigo === "PICO"), des = rows.filter(r => r.empleado_id === e.id && r.codigo === "DESP");
       return { e, n: mios.length, d: des.length, ult: mios.length ? mios[mios.length - 1].fecha : "" };
     }).sort((a, b) => b.n - a.n || a.e.orden - b.e.orden);
-    const sinPico = S.emps.filter(e => e.hace_pico === false).map(e => e.nombre);
     cont.replaceChildren(
       h("div", { class: "mes" },
         h("button", { disabled: S.infY <= S.anioMin, onclick: async () => { S.infY--; await cargarAnio(S.infY); dibujar(); } }, "‹"), h("b", {}, S.infY),
@@ -725,7 +724,7 @@ function vistaInformes() {
         h("h2", {}, "Reparto de picos"), h("p", { class: "sub" }, "Picos ya hechos este año, de más a menos."),
         h("table", { class: "ipicos" }, h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Picos"), h("th", {}, "Desp."), h("th", {}, "Último pico"))),
           h("tbody", {}, picosEmp.map(x => h("tr", {}, h("td", {}, x.e.nombre), h("td", {}, h("b", {}, x.n)), h("td", {}, x.d), h("td", {}, x.ult ? fechaLarga(x.ult) : "–"))))),
-        sinPico.length ? h("p", { class: "det" }, sinPico.join(", ") + ": no hace pico.") : null));
+        null));
   };
   dibujar();
   cargarAnio(S.infY).then(dibujar);   // refresca al entrar

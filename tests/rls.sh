@@ -20,6 +20,7 @@ $P -f supabase/migracion_006_material.sql >/dev/null
 $P -f supabase/migracion_007_dias_pasados.sql >/dev/null
 $P -f supabase/migracion_008_nombres_habilitaciones.sql >/dev/null
 $P -f supabase/migracion_010_primer_acceso.sql >/dev/null
+$P -f supabase/migracion_011_codigos.sql >/dev/null
 $P -f supabase/migracion_010_primer_acceso.sql >/dev/null   # repetirla no debe dar error
 $P -f tests/after_schema.sql
 $P -f tests/rls_scenarios.sql 2>&1 | grep -E "^(==|NOTICE|psql|ERROR)" | sed 's/^NOTICE:  //' | tee /tmp/rls_out.txt
