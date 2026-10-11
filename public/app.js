@@ -85,7 +85,7 @@ async function cargarDistritos() {
 }
 async function cambiarDistrito(d) {
   ponerDistrito(d);
-  ponerLS(DIST_KEY, d.id === S.me.distrito_id ? null : String(d.id));
+  ponerLS(DIST_KEY, !d.id || d.id === S.me.distrito_id ? null : String(d.id));
   await Promise.all([cargarMes(), cargarResumen()]);
   pintar();
 }
@@ -287,7 +287,10 @@ function cabecera() {
   const b = (v, txt) => h("button", { class: S.vista === v ? "on" : "", onclick: () => { S.vista = v; pintar(); } }, icono(v), txt);
   return h("header", {},
     modoAdmin()
-      ? h("button", { class: "marca admin", title: "Cambiar de turno o distrito", onclick: abrirSelectorDistrito }, h("i", {}, S.dist.turno), S.dist.nombre, h("span", { class: "adm" }, "ADMIN ▾"))
+      ? h("div", { class: "marca admin" },
+          h("button", { class: "selturno", title: "Elegir turno", onclick: ev => menuTurnos(ev.currentTarget) }, h("i", {}, S.dist.turno, h("b", {}, "▾"))),
+          h("button", { class: "seldis", title: "Elegir distrito", onclick: ev => menuDistritos(ev.currentTarget) }, h("span", {}, S.dist.nombre), h("b", {}, "▾")),
+          h("span", { class: "adm" }, "ADMIN"))
       : h("div", { class: "marca" }, h("i", {}, S.dist.turno), S.dist.nombre),
     h("nav", { class: "tabs" }, b("res", "Resumen"), b("cal", "Calendario"), b("form", "Formación"), b("inf", "Informes"), b("hist", "Cambios"), b("cuenta", "Cuenta")),
     h("span", { class: "yo" }, S.me.nombre));
@@ -868,64 +871,85 @@ function vistaInformes() {
 
 // ---------- modo administrador: elegir y crear turnos/distritos ----------
 function distritoVacio() {
+  if (!S.dist.id) return h("div", { class: "pag" }, h("h2", {}, `Turno ${S.dist.turno}`),
+    h("p", {}, "Este turno todavía no tiene ningún distrito."),
+    h("button", { class: "btn", onclick: () => crearDistrito(S.dist.letra, S.dist.zona) }, `+ Crear un distrito en ${S.dist.turno}`));
   return h("div", { class: "pag" }, h("h2", {}, `${S.dist.nombre} · ${S.dist.turno}`),
     h("p", {}, "Este distrito todavía no tiene personas dadas de alta."),
     h("p", { class: "sub" }, `Turno ${S.dist.letra}, zona ${S.dist.zona}. Su calendario ya sigue el ciclo del turno ${S.dist.letra}.`),
-    h("button", { class: "btn", onclick: abrirSelectorDistrito }, "Cambiar de distrito"));
+    h("button", { class: "btn", onclick: () => abrirPersonas() }, "+ Dar de alta personas"));
 }
-function abrirSelectorDistrito() {
-  let letra = S.dist.letra, zona = S.dist.zona;
+// ---------- desplegables de la cabecera (modo administrador) ----------
+function abrirMenu(ancla, contenido) {
+  cerrarMenu();
+  const r = ancla.getBoundingClientRect();
+  const m = h("div", { class: "menu", id: "menuCab", role: "menu" }, contenido);
+  m.style.top = (r.bottom + 6) + "px";
+  m.style.left = Math.max(8, Math.min(r.left, innerWidth - 300)) + "px";
+  document.body.append(m);
+  setTimeout(() => document.addEventListener("click", fueraMenu, true), 0);
+}
+function fueraMenu(ev) { const m = document.getElementById("menuCab"); if (m && !m.contains(ev.target)) { ev.stopPropagation(); ev.preventDefault(); cerrarMenu(); } }
+function cerrarMenu() { const m = document.getElementById("menuCab"); if (m) m.remove(); document.removeEventListener("click", fueraMenu, true); }
+const distritosDe = (letra, zona) => (S.distritos || []).filter(d => d.letra === letra && d.zona === zona);
+const personasDe = id => (S.todos || []).filter(e => e.distrito_id === id).length;
+function irATurno(letra, zona) {
+  cerrarMenu();
+  const ds = distritosDe(letra, zona);
+  const mio = ds.find(d => d.id === S.me.distrito_id);
+  cambiarDistrito(mio || ds[0] || { id: null, nombre: "Sin distritos", letra, zona, minimo_operativo: 6, tercio: 4 });
+}
+function menuTurnos(ancla) {
+  abrirMenu(ancla, [h("div", { class: "mtit" }, "Turno"),
+    h("div", { class: "rejilla" }, [...LETRAS].flatMap(l => [1, 2].map(z => {
+      const n = distritosDe(l, z).length, act = S.dist.letra === l && S.dist.zona === z;
+      return h("button", { class: "mt" + (act ? " act" : "") + (n ? "" : " vacio"), title: n ? `${n} distrito${n === 1 ? "" : "s"}` : "Sin distritos", onclick: () => irATurno(l, z) }, l + z, h("small", {}, n || "–"));
+    })))]);
+}
+function menuDistritos(ancla) {
+  const ds = distritosDe(S.dist.letra, S.dist.zona);
+  abrirMenu(ancla, [h("div", { class: "mtit" }, `Distritos del ${S.dist.turno}`),
+    ds.length ? ds.map(d => h("button", { class: "md" + (d.id === S.dist.id ? " act" : ""), onclick: () => { cerrarMenu(); cambiarDistrito(d); } },
+      h("span", {}, d.nombre), h("small", {}, `${personasDe(d.id)} persona${personasDe(d.id) === 1 ? "" : "s"}`)))
+      : h("div", { class: "mvacio" }, "Todavía no hay distritos en este turno."),
+    h("hr"),
+    S.dist.id ? h("button", { class: "md acc", onclick: () => { cerrarMenu(); abrirPersonas(); } }, `👥 Personas de ${S.dist.nombre}`) : null,
+    h("button", { class: "md acc", onclick: () => { cerrarMenu(); crearDistrito(S.dist.letra, S.dist.zona); } }, `+ Crear un distrito en ${S.dist.turno}`)]);
+}
+function crearDistrito(letra, zona) {
   const dlg = h("dialog", { class: "seldist" });
-  const cont = h("div", {});
-  const personas = id => (S.todos || []).filter(e => e.distrito_id === id).length;
-  const dibujar = () => {
-    const lista = (S.distritos || []).filter(d => d.letra === letra && d.zona === zona);
-    const nombre = h("input", { type: "text", placeholder: "Nombre del distrito nuevo", maxlength: "60" });
-    const minimo = h("input", { type: "number", min: "1", max: "50", value: "6" });
-    const tercio = h("input", { type: "number", min: "1", max: "50", value: "4" });
-    const err = h("div", { class: "error" });
-    const crear = async ev => {
-      const n = nombre.value.trim();
-      if (!n) { err.textContent = "Escribe el nombre del distrito."; return; }
-      ev.currentTarget.disabled = true; err.textContent = "Creando…";
-      const { data, error } = await sb.from("distritos")
-        .insert({ nombre: n, letra, zona, minimo_operativo: +minimo.value || 6, tercio: +tercio.value || 4 }).select().single();
-      if (error) { ev.currentTarget.disabled = false; err.textContent = /duplicate|unique/i.test(error.message) ? "Ya existe un distrito con ese nombre en este turno y zona." : "No se pudo crear: " + error.message; return; }
-      await cargarDistritos(); dlg.close(); toast(`Distrito «${data.nombre}» creado en ${letra}${zona}`, 3000);
-      cambiarDistrito(data);
-    };
-    cont.replaceChildren(
-      h("h4", {}, "1. Turno"),
-      h("div", { class: "opciones" }, [...LETRAS].map(l => h("button", { class: "btn sec" + (l === letra ? " act" : ""), onclick: () => { letra = l; dibujar(); } }, l))),
-      h("h4", {}, "2. Zona"),
-      h("div", { class: "opciones" }, [1, 2].map(z => h("button", { class: "btn sec" + (z === zona ? " act" : ""), onclick: () => { zona = z; dibujar(); } }, "Zona " + z))),
-      h("h4", {}, `3. Distrito del ${letra}${zona}`),
-      lista.length ? h("div", { class: "distlista" }, lista.map(d => h("button", { class: "btn sec full" + (d.id === S.dist.id ? " act" : ""), onclick: () => { dlg.close(); cambiarDistrito(d); } },
-        d.nombre, h("small", {}, ` · ${personas(d.id)} persona${personas(d.id) === 1 ? "" : "s"}`))))
-        : h("p", { class: "sub" }, "Todavía no hay ningún distrito en este turno y zona."),
-      h("details", { class: "nuevodist" }, h("summary", {}, `+ Crear un distrito en ${letra}${zona}`),
-        h("label", {}, "Nombre", nombre),
-        h("div", { class: "dosnum" }, h("label", {}, "Mínimo de personas trabajando", minimo), h("label", {}, "Máximo de ausentes (tercio)", tercio)),
-        h("button", { class: "btn full", onclick: crear }, "Crear distrito"), err));
+  const nombre = h("input", { type: "text", placeholder: "Nombre del distrito", maxlength: "60" });
+  const minimo = h("input", { type: "number", min: "1", max: "50", value: "6" });
+  const tercio = h("input", { type: "number", min: "1", max: "50", value: "4" });
+  const err = h("div", { class: "error" });
+  const crear = async ev => {
+    const n = nombre.value.trim();
+    if (!n) { err.textContent = "Escribe el nombre del distrito."; return; }
+    const btn = ev.currentTarget; btn.disabled = true; err.textContent = "Creando…";
+    const { data, error } = await sb.from("distritos")
+      .insert({ nombre: n, letra, zona, minimo_operativo: +minimo.value || 6, tercio: +tercio.value || 4 }).select().single();
+    if (error) { btn.disabled = false; err.textContent = /duplicate|unique/i.test(error.message) ? "Ya existe un distrito con ese nombre en este turno." : "No se pudo crear: " + error.message; return; }
+    await cargarDistritos(); dlg.close(); toast(`Distrito «${data.nombre}» creado en ${letra}${zona}`, 3000);
+    cambiarDistrito(data);
   };
-  dibujar();
-  dlg.append(h("h3", {}, "Ver otro turno o distrito"), cont,
-    h("div", { class: "fila" }, h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cerrar"),
-      S.dist.id !== S.me.distrito_id ? h("button", { class: "btn sec", onclick: () => { dlg.close(); cambiarDistrito(miDistrito()); } }, "Volver al mío") : null));
+  dlg.append(h("h3", {}, `Nuevo distrito en ${letra}${zona}`),
+    h("div", { class: "nuevodist", style: "border:0;margin:0;padding:0" },
+      h("label", {}, "Nombre", nombre),
+      h("div", { class: "dosnum" }, h("label", {}, "Mínimo de personas trabajando", minimo), h("label", {}, "Máximo de ausentes (tercio)", tercio))),
+    err, h("div", { class: "fila" }, h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cancelar"), h("button", { class: "btn", onclick: crear }, "Crear distrito")));
   dlg.addEventListener("close", () => dlg.remove());
-  document.body.append(dlg); dlg.showModal();
+  document.body.append(dlg); dlg.showModal(); nombre.focus();
 }
 function bloqueAdmin() {
   const on = modoAdmin();
   return [h("h3", {}, "Modo administrador"),
     h("p", { class: "sub" }, on
-      ? `Activado. Estás viendo ${S.dist.nombre} (${S.dist.turno}). Pulsa el nombre del distrito, arriba, para cambiar de turno o distrito, o para crear uno nuevo.`
+      ? `Activado. Estás viendo ${S.dist.nombre} (${S.dist.turno}). Arriba, pulsa el recuadro del turno para cambiar de turno, y el nombre del distrito para cambiar de distrito, crear uno nuevo o gestionar sus personas.`
       : "Solo lo tienes tú. Te deja ver cualquier turno y distrito y crear distritos nuevos. Apagado, ves tu distrito como siempre."),
     h("div", { class: "opciones" },
       h("button", { class: "btn sec" + (on ? "" : " act"), onclick: async () => { if (!on) return; ponerLS(ADMIN_KEY, null); ponerLS(DIST_KEY, null); await cambiarDistrito(miDistrito()); } }, "Apagado"),
       h("button", { class: "btn sec" + (on ? " act" : ""), onclick: async () => { if (on) return; ponerLS(ADMIN_KEY, "1"); await cargarDistritos(); pintar(); } }, "Encendido")),
-    on ? h("button", { class: "btn full", onclick: abrirSelectorDistrito }, "Cambiar de turno o distrito") : null,
-    on ? h("button", { class: "btn sec full", onclick: abrirPersonas }, `Personas de ${S.dist.nombre}`) : null];
+    on && S.dist.id ? h("button", { class: "btn full", onclick: () => abrirPersonas() }, `👥 Personas de ${S.dist.nombre}`) : null];
 }
 
 // ---------- personas del distrito (solo administrador) ----------
@@ -944,10 +968,22 @@ function abrirPersonas() {
   const dibujar = () => {
     const del = (S.fichas || []).filter(e => e.distrito_id === S.dist.id);
     const activas = del.filter(e => e.activo), bajas = del.filter(e => !e.activo);
-    const fila = e => h("button", { class: "btn sec full persona", onclick: () => editarPersona(e, dibujar) },
-      h("span", {}, e.nombre), h("small", {}, (ROL[e.rol] || e.rol) + (e.admin ? " · admin" : "") + (e.hace_pico === false ? " · sin PICO" : "") + (e.pareja_id ? " · pareja: " + nombreEmp(e.pareja_id) : "")));
+    const cambiarRol = async (e, btn) => {
+      const nuevo = e.rol === "responsable" ? "agente" : "responsable";
+      if (e.id === S.me.id && nuevo === "agente") { toast("No puedes quitarte a ti mismo de responsable.", 3500); return; }
+      if (!confirm(nuevo === "responsable" ? `¿Hacer responsable a ${e.nombre}? Podrá editar a todo su distrito y poner PICO y DESP.` : `¿Quitar a ${e.nombre} de responsable? Pasará a editar solo sus propios días.`)) return;
+      btn.disabled = true;
+      const { error } = await sb.from("empleados").update({ rol: nuevo }).eq("id", e.id);
+      if (error) { btn.disabled = false; toast("No se pudo cambiar: " + error.message, 6000); return; }
+      await recargarEmpleados(); dibujar();
+    };
+    const fila = e => h("div", { class: "persona" },
+      h("button", { class: "pcol", title: "Editar datos, baja o borrar", onclick: () => editarPersona(e, dibujar) },
+        h("b", {}, e.nombre), h("small", { class: "correo" }, e.email || "sin correo"),
+        h("small", {}, (ROL[e.rol] || e.rol) + (e.admin ? " · admin" : "") + (e.hace_pico === false ? " · sin PICO" : "") + (e.pareja_id ? " · pareja: " + nombreEmp(e.pareja_id) : ""))),
+      e.id === S.me.id ? null : h("button", { class: "btn mini " + (e.rol === "responsable" ? "sec" : ""), onclick: ev => cambiarRol(e, ev.currentTarget) }, e.rol === "responsable" ? "Quitar responsable" : "Hacer responsable"));
     cont.replaceChildren(...[
-      h("p", { class: "sub" }, `${activas.length} persona${activas.length === 1 ? "" : "s"} en ${S.dist.nombre} (${S.dist.turno}). Pulsa en alguien para cambiar sus datos o darle de baja.`),
+      h("p", { class: "sub" }, `${activas.length} persona${activas.length === 1 ? "" : "s"} en ${S.dist.nombre} (${S.dist.turno}). Pulsa en alguien para cambiar sus datos, darle de baja o borrarlo.`),
       h("button", { class: "btn full", onclick: () => editarPersona(null, dibujar) }, "+ Dar de alta a una persona"),
       h("div", { class: "distlista" }, activas.map(fila)),
       bajas.length ? [h("h4", {}, "De baja"), h("div", { class: "distlista" }, bajas.map(e => h("button", { class: "btn sec full persona baja", onclick: async ev => {
@@ -959,7 +995,7 @@ function abrirPersonas() {
       } }, h("span", {}, e.nombre), h("small", {}, "Reactivar"))))] : null].flat().filter(Boolean));
   };
   dibujar();
-  dlg.append(h("h3", {}, "Personas"), cont, h("div", { class: "fila" }, h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cerrar")));
+  dlg.append(h("h3", {}, `Personas · ${S.dist.nombre} (${S.dist.turno})`), cont, h("div", { class: "fila" }, h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cerrar")));
   dlg.addEventListener("close", () => { dlg.remove(); pintar(); });
   document.body.append(dlg); dlg.showModal();
 }
@@ -1018,6 +1054,27 @@ function editarPersona(emp, alVolver) {
     if (error) { ev.currentTarget.disabled = false; err.textContent = "No se pudo: " + error.message; return; }
     await recargarEmpleados(); dlg.close(); if (alVolver) alVolver();
   } }, "Dar de baja") : null;
+  const borrar = emp && emp.id !== S.me.id ? h("button", { class: "btn peligro", onclick: async ev => {
+    const btn = ev.currentTarget;
+    btn.disabled = true; err.textContent = "Comprobando…";
+    const [a, f] = await Promise.all([
+      sb.from("asignaciones").select("fecha", { count: "exact", head: true }).eq("empleado_id", emp.id),
+      sb.from("formaciones").select("id", { count: "exact", head: true }).eq("empleado_id", emp.id)]);
+    btn.disabled = false; err.textContent = "";
+    const nA = a.count || 0, nF = f.count || 0;
+    if (a.error || f.error) { err.textContent = "No se pudo comprobar su historial."; return; }
+    if (nA || nF) { err.textContent = `No se puede borrar: tiene ${nA} día${nA === 1 ? "" : "s"} apuntado${nA === 1 ? "" : "s"} y ${nF} formación${nF === 1 ? "" : "es"}. Usa «Dar de baja»: deja de entrar pero su historial se conserva.`; return; }
+    // Doble aviso
+    if (!confirm(`¿BORRAR a ${emp.nombre} para siempre?\n\nEsto no se puede deshacer. Si solo deja el equipo, usa «Dar de baja».`)) return;
+    const escrito = prompt(`Segundo aviso. Para confirmar, escribe el nombre exacto: ${emp.nombre}`);
+    if (escrito == null) return;
+    if (escrito.trim() !== emp.nombre) { err.textContent = "El nombre no coincide. No se ha borrado nada."; return; }
+    btn.disabled = true;
+    await ponerPareja(emp.id, null);
+    const { error } = await sb.from("empleados").delete().eq("id", emp.id);
+    if (error) { btn.disabled = false; err.textContent = /foreign key|violates/i.test(error.message) ? "No se puede borrar porque aparece en el historial de cambios de otros. Usa «Dar de baja»." : "No se pudo borrar: " + error.message; return; }
+    await recargarEmpleados(); dlg.close(); if (alVolver) alVolver(); toast(`${emp.nombre} borrado`, 3000);
+  } }, "Borrar") : null;
   dlg.append(
     h("h3", {}, nueva ? "Dar de alta" : emp.nombre), h("p", { class: "sub" }, `${S.dist.nombre} · ${S.dist.turno}`),
     h("div", { class: "nuevodist", style: "border:0;margin:0;padding:0" },
@@ -1028,7 +1085,8 @@ function editarPersona(emp, alVolver) {
       h("label", {}, "Pareja (binomio)", pareja),
       h("label", { class: "check" }, pico, " Hace PICO")),
     err,
-    h("div", { class: "fila" }, baja || h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cancelar"),
+    emp ? h("div", { class: "fila peligros" }, baja, borrar) : null,
+    h("div", { class: "fila" }, h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cancelar"),
       h("button", { class: "btn", onclick: guardarP }, nueva ? "Dar de alta" : "Guardar")));
   dlg.addEventListener("close", () => dlg.remove());
   document.body.append(dlg); dlg.showModal(); nombre.focus();
