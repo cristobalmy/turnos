@@ -311,3 +311,17 @@ header .marca.admin .seldis:hover span,header .marca.admin .selturno:hover i{out
 .persona .correo{opacity:.65;font-size:.75rem;overflow:hidden;text-overflow:ellipsis}
 .peligros{margin-top:.8rem}
 .btn.peligro{background:var(--rojo);color:#fff;border-color:var(--rojo)}
+
+/* ---- móvil: sin zoom y sin desplazamiento lateral ---- */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation}
+html,body{max-width:100%;overflow-x:clip}
+header .marca{min-width:0;overflow:hidden}
+header .marca:not(.admin){white-space:nowrap;text-overflow:ellipsis}
+header .marca i{flex:none}
+dialog{max-width:min(430px,calc(100vw - 20px))}
+@media (max-width:700px){
+  /* el iPhone amplía la pantalla al escribir en campos de letra menor de 16px: así no lo hace */
+  input,select,textarea{font-size:16px !important}
+  nav.tabs{max-width:100vw;overflow:hidden}
+  nav.tabs button span,nav.tabs button{white-space:nowrap;text-overflow:ellipsis}
+}
