@@ -27,6 +27,11 @@ $P -f supabase/migracion_013_crecimiento.sql >/dev/null   # repetirla no debe da
 $P -f supabase/migracion_014_matri.sql >/dev/null
 $P -f supabase/migracion_015_defensa_extensible.sql >/dev/null
 $P -f supabase/migracion_010_primer_acceso.sql >/dev/null   # repetirla no debe dar error
+$P -f supabase/migracion_016_turnos_y_distritos.sql >/dev/null
+$P -f supabase/migracion_016_deshacer.sql >/dev/null        # deshacerla debe funcionar
+$P -c "select 1/(case when (select count(*) from dias where turno='S') > 0 then 1 else 0 end)" >/dev/null   # y devolver los salientes
+$P -f supabase/migracion_016_turnos_y_distritos.sql >/dev/null
+$P -f supabase/migracion_016_turnos_y_distritos.sql >/dev/null   # repetirla no debe dar error
 $P -f tests/after_schema.sql
 $P -f tests/rls_scenarios.sql 2>&1 | grep -E "^(==|NOTICE|psql|ERROR)" | sed 's/^NOTICE:  //' | tee /tmp/rls_out.txt
 ! grep -q FALLO /tmp/rls_out.txt && echo "TODO CORRECTO" || { echo "HAY FALLOS"; exit 1; }

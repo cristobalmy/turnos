@@ -94,7 +94,7 @@ begin; insert into formaciones(empleado_id,nombre,fecha) values (4,'TAIP','2026-
 set local role authenticated; select set_config('request.jwt.claims','{"email":"nacho@t.es"}',true);
 select pg_temp.chk((select count(*) from formaciones) = 1, 'todo el equipo ve las de los demás');
 select pg_temp.chk(pg_temp.filas($$update formaciones set nombre='TAU 1' where empleado_id=4$$) = 1, 'un responsable puede editar las de otros');
-select pg_temp.chk(not pg_temp.falla($$insert into cursos(nombre,tipo,orden) values ('Nuevo','Formación',99)$$), 'un responsable puede ampliar la lista');
+select pg_temp.chk(pg_temp.falla($$insert into cursos(nombre,tipo,orden) values ('Nuevo','Formación',99)$$), 'la lista de cursos (común a todos) ya solo la amplía el administrador (desde 016)');
 rollback;
 
 \echo == Días pasados
@@ -130,7 +130,7 @@ select pg_temp.chk(not pg_temp.falla($$insert into asignaciones(empleado_id,fech
 select pg_temp.chk(pg_temp.filas($$update asignaciones set codigo='AP' where empleado_id=4 and fecha='2026-11-02'$$) = 1, 'puede cambiar días de otra persona');
 select pg_temp.chk(pg_temp.filas($$delete from asignaciones where empleado_id=4 and fecha='2026-11-02'$$) = 1, 'puede borrar días de otra persona');
 select pg_temp.chk(pg_temp.filas($$update empleados set orden=orden where nombre='Gustavo'$$) = 1, 'puede gestionar empleados');
-select pg_temp.chk(pg_temp.filas($$update config set valor='6' where clave='minimo_operativo'$$) = 1, 'puede cambiar el mínimo operativo');
+select pg_temp.chk(pg_temp.filas($$update config set valor='6' where clave='minimo_operativo'$$) = 0, 'los ajustes comunes ya solo los cambia el administrador (desde 016)');
 rollback;
 
 \echo == Primer acceso (contraseña elegida)
@@ -163,3 +163,47 @@ rollback;
 select pg_temp.chk((select count(*) from cursos where nombre = 'Defensa extensible' and tipo = 'Habilitación') = 1, 'habilitación: Defensa extensible');
 select pg_temp.chk((select count(*) from cursos where nombre = 'Extensible' and tipo = 'Material') = 1, 'material: Extensible');
 select pg_temp.chk((select count(*) from cursos where nombre like 'Extensible (%') = 0, 'ya no queda el nombre entre paréntesis');
+
+\echo == Migración 016: turnos A–F, zonas y separación por distrito
+select pg_temp.chk((select count(*) from dias where turno = 'S') = 0, 'ya no queda ningún "saliente": son 6 libres');
+select pg_temp.chk((select count(*) from dias where turno <> turno_ciclo('D', fecha)) = 0, 'el turno D calculado coincide con todo el calendario 2026–2035');
+select pg_temp.chk(turno_ciclo('D','2026-10-18') = 'T' and turno_ciclo('E','2026-10-18') = 'M' and turno_ciclo('C','2026-10-18') = 'N', 'cuando D hace tarde, E hace mañana y C noche');
+select pg_temp.chk(turno_ciclo('E','2026-10-20') = 'T' and turno_ciclo('F','2026-10-20') = 'M', 'cuando E hace tarde, F hace mañana');
+select pg_temp.chk(turno_ciclo('F','2026-10-22') = 'T' and turno_ciclo('A','2026-10-22') = 'M', 'y la vuelta se cierra: cuando F hace tarde, A hace mañana');
+select pg_temp.chk((select bool_and((select count(*) from unnest(array['A','B','C','D','E','F']) l where turno_ciclo(l, d::date) = t) = 1)
+  from generate_series(date '2026-01-01', date '2027-12-31', interval '1 day') d, unnest(array['M','T','N']) t), 'cada día hay exactamente un turno de mañana, uno de tarde y uno de noche');
+select pg_temp.chk((select letra = 'D' and zona = 2 and turno = 'D2' from distritos where nombre = 'Usera-Villaverde'), 'Usera-Villaverde queda en el turno D, zona 2');
+
+begin;
+insert into distritos(nombre, letra, zona) values ('Prueba', 'C', 1);
+select pg_temp.chk((select turno from distritos where nombre = 'Prueba') = 'C1', 'al crear un distrito, el nombre corto (C1) sale solo');
+insert into empleados(nombre, email, rol, orden, distrito_id) values
+  ('Pepe', 'pepe@t.es', 'responsable', 1, (select id from distritos where nombre = 'Prueba')),
+  ('Gustavo', 'gustavo2@t.es', 'agente', 2, (select id from distritos where nombre = 'Prueba'));
+select pg_temp.chk(true, 'puede haber dos personas con el mismo nombre en distritos distintos');
+insert into asignaciones(empleado_id, fecha, codigo) values ((select id from empleados where email = 'gustavo2@t.es'), '2027-03-01', 'V1');
+
+set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
+select pg_temp.chk((select count(*) from empleados) = 12, 'un agente de Usera solo ve a las 12 personas de su distrito');
+select pg_temp.chk((select count(*) from asignaciones a join empleados e on e.id = a.empleado_id where e.email = 'gustavo2@t.es') = 0
+  and pg_temp.filas($$select 1 from asignaciones where fecha = '2027-03-01' and codigo = 'V1'$$) = 0, 'y no ve el calendario de otro distrito');
+
+select set_config('request.jwt.claims','{"email":"nacho@t.es"}',true);
+select pg_temp.chk((select count(*) from asignaciones) = 985, 'un responsable de Usera sigue viendo todo su calendario');
+select pg_temp.chk(not pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values (4,'2027-03-02','PICO')$$), 'y sigue pudiendo poner PICO a los suyos');
+select pg_temp.chk(pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values ((select id from empleados where email='pepe@t.es'),'2027-03-02','V1')$$), 'pero NO puede poner códigos a gente de otro distrito');
+select pg_temp.chk(pg_temp.falla($$insert into empleados(nombre,rol,orden,distrito_id) values ('Intruso','agente',9,(select id from distritos where nombre='Prueba'))$$), 'ni dar de alta gente en otro distrito');
+select pg_temp.chk(pg_temp.falla($$update empleados set distrito_id = (select max(id) from distritos) where nombre = 'Gustavo'$$), 'ni mandar a uno de los suyos a otro distrito');
+select pg_temp.chk(pg_temp.falla($$insert into codigos(codigo,descripcion,tipo,orden) values ('X','x','Especial',99)$$), 'los códigos comunes ya solo los cambia el administrador');
+
+select set_config('request.jwt.claims','{"email":"pepe@t.es"}',true);
+select pg_temp.chk((select count(*) from empleados) = 2, 'el responsable del otro distrito solo ve a los suyos');
+select pg_temp.chk(pg_temp.filas($$update asignaciones set codigo = 'AP' where empleado_id = 4$$) = 0, 'y no puede tocar a nadie de Usera');
+select pg_temp.chk(pg_temp.filas($$update asignaciones set codigo = 'AP' where fecha = '2027-03-01'$$) = 1, 'pero sí a la gente de su distrito');
+
+select set_config('request.jwt.claims','{"email":"cristobal@t.es"}',true);
+select pg_temp.chk((select count(*) from empleados) = 14, 'el administrador ve a todos los distritos');
+select pg_temp.chk(not pg_temp.falla($$insert into asignaciones(empleado_id,fecha,codigo) values ((select id from empleados where email='pepe@t.es'),'2027-03-03','V1')$$), 'y puede editar en cualquier distrito');
+select pg_temp.chk(not pg_temp.falla($$insert into distritos(nombre, letra, zona) values ('Otro', 'A', 2)$$), 'y crear distritos');
+select pg_temp.chk(pg_temp.falla($$insert into distritos(nombre, letra, zona) values ('Malo', 'G', 3)$$), 'solo con turnos A–F y zona 1 o 2');
+rollback;

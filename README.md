@@ -34,6 +34,7 @@ Después, `supabase/migracion_010_primer_acceso.sql` (cada persona elige su cont
 Después, `supabase/migracion_011_codigos.sql` (textos de los códigos y limpieza de PAT/MAT/LAC/AUTOMOCIÓN).
 Después, `supabase/migracion_012_quitar_automocion.sql` (JUICIO sin descripción y AUTOMOCIÓN borrado).
 Después, `supabase/migracion_013_crecimiento.sql` (calendario hasta 2035, distritos, notas privadas y enlace del calendario del móvil).
+Después, `supabase/migracion_016_turnos_y_distritos.sql` (turnos A–F con zona 1/2, ciclo con 6 libres y cada distrito ve y edita solo lo suyo; el administrador, todo). Para deshacerla: `supabase/migracion_016_deshacer.sql`.
 
 Edge Functions (Verify JWT desactivado en ambas): `avisar` (avisos y alerta de tercio a responsables) y `calendario` (enlace .ics personal).
 Pruebas: `bash tests/rls.sh`, `node tests/mensaje.test.mjs`, `node tests/funciones.test.mjs`.
