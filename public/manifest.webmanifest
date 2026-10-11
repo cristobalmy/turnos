@@ -1,7 +1,7 @@
 {
-  "name": "Turno D",
-  "short_name": "Turno D",
-  "description": "Turnos y vacaciones de Turno D - Usera/Villaverde",
+  "name": "Tercio",
+     "short_name": "Tercio",
+     "description": "Tercio - Turnos y vacaciones de Usera-Villaverde D2",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0f2a4a",
