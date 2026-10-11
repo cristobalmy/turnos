@@ -70,7 +70,7 @@ function pantallaLogin(msg) {
       // Mensaje neutro: no se revela si el correo existe.
       err.textContent = "Si ese correo está autorizado, te llegará un mensaje con un enlace para crear una contraseña nueva. Mira también el correo no deseado.";
     } }, "¿Has olvidado la contraseña?"));
-  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Usera-Villaverde"), h("div", { class: "sub" }, "Turno D2"), f));
+  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Bienvenido a Tercio"), h("div", { class: "sub" }, "Gestión de turnos y vacaciones"), f));
 }
 
 function pantallaNuevaClave(primera) {
