@@ -457,7 +457,7 @@ function bloquePico() {
   const lineas = [linea("Hoy", mk(0)), linea("Mañana", mk(1))];
   if (S.sel !== mk(0) && S.sel !== mk(1)) lineas.push(linea(fechaCorta(S.sel), S.sel));
   return h("div", { class: "picoreco" }, h("div", { class: "pt" }, "Pico recomendado"), lineas,
-    h("small", { class: "det" }, "Solo hace falta con número impar de personas. Candidatos: libres con la pareja ausente; va primero quien lleva más tiempo sin pico."));
+    h("small", { class: "det" }, "Solo hace falta con número impar de personas. Candidatos: libres con su binomio ausente; va primero quien lleva más tiempo sin pico."));
 }
 
 // Selector directo de mes y año
@@ -639,7 +639,7 @@ function abrirEdicion(emp, f) {
   const cand = esResp() && !actual && ["M", "T", "N"].includes(S.dias[f]) && hacePicoFalta(f) ? candidatosPico(f) : [];
   dlg.append(...[
     h("h3", {}, emp.nombre), h("p", { class: "sub" }, `${DLARGO[new Date(y, m - 1, d).getDay()]} ${d}/${m}/${y} · turno ${TURNO_NOMBRE[S.dias[f]] ? TURNO_NOMBRE[S.dias[f]].toLowerCase() : "?"}`),
-    cand.length ? h("div", { class: "cand" }, "Candidatos a PICO (libres con pareja ausente): " + cand.map(c => c.nombre).join(", ")) : null,
+    cand.length ? h("div", { class: "cand" }, "Candidatos a PICO (libres con su binomio ausente): " + cand.map(c => c.nombre).join(", ")) : null,
     h("div", { class: "contenido" }, secciones),
     emp.id === S.me.id ? bloqueNota(f) : null,
     h("div", { class: "fila" },
