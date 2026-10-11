@@ -113,7 +113,7 @@ async function arrancar() {
   const tc = (cfg.data || []).find(x => x.clave === "tercio");
   if (tc) S.tercio = +tc.valor || 4;
   S.me = S.emps.find(x => (x.email || "").toLowerCase() === email) || null;
-  if (!S.me) return sinAcceso("Tu cuenta no está autorizada en Turno D. Habla con un responsable.");
+  if (!S.me) return sinAcceso("Tu cuenta no está autorizada en Tercio. Habla con un responsable.");
   if (S.me.clave_cambiada === false) return pantallaNuevaClave(true);
   if (S.me.distrito_id) {
     const dd = await sb.from("distritos").select("minimo_operativo,tercio").eq("id", S.me.distrito_id).maybeSingle();
@@ -133,7 +133,7 @@ async function arrancar() {
   pintar();
 }
 function sinAcceso(msg) {
-  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Turno D"), h("p", { class: "error" }, msg),
+  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Tercio"), h("p", { class: "error" }, msg),
     h("button", { class: "btn", onclick: salir }, "Salir")));
 }
 async function salir() { await sb.auth.signOut(); if (S.canal) sb.removeChannel(S.canal); S.canal = null; pantallaLogin(); }
@@ -776,7 +776,7 @@ function bloqueAvisos() {
     const on = !!sub && Notification.permission === "granted";
     estado.textContent = on ? "Avisos activados en este móvil." : (Notification.permission === "denied" ? "Avisos bloqueados en los ajustes del móvil." : "Avisos desactivados en este móvil.");
     const bs = [h("button", { class: "btn full", onclick: async ev => { ev.target.disabled = true; if (on) await desactivarAvisos(); else await activarAvisos(); pintarEstado(); } }, on ? "Desactivar avisos" : "Activar avisos")];
-    if (on) bs.push(h("button", { class: "btn sec full", onclick: async () => { const r = await navigator.serviceWorker.ready; r.showNotification("Turno D", { body: "Los avisos funcionan en este móvil ✔", icon: "icon-192.png" }); } }, "Probar en este móvil"));
+    if (on) bs.push(h("button", { class: "btn sec full", onclick: async () => { const r = await navigator.serviceWorker.ready; r.showNotification("Tercio", { body: "Los avisos funcionan en este móvil ✔", icon: "icon-192.png" }); } }, "Probar en este móvil"));
     caja.replaceChildren(estado, ...bs);
   };
   pintarEstado();

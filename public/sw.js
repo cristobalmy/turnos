@@ -18,7 +18,7 @@ self.addEventListener("fetch", e => {
 self.addEventListener("push", e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : "" }; }
-  e.waitUntil(self.registration.showNotification(d.title || "Turno D", {
+  e.waitUntil(self.registration.showNotification(d.title || "Tercio", {
     body: d.body || "Hay cambios en el calendario",
     icon: "icon-192.png", badge: "icon-192.png",
     tag: d.tag || "turnos", renotify: true,
