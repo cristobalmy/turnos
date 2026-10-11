@@ -69,8 +69,8 @@ select pg_temp.chk((select count(*) from net.llamadas) = 0, 'un cambio desde el 
 rollback;
 
 \echo == Cursos y habilitaciones (lista cerrada)
-select pg_temp.chk((select string_agg(nombre, ' | ' order by nombre) from cursos where tipo='Habilitación') = 'Extensible | IE - Taser 10 | IE - Taser 7', 'las habilitaciones ya no llevan "Habilitación" delante');
-select pg_temp.chk((select count(*) from cursos where nombre = 'Extensible (material)' and tipo = 'Material') = 1, 'el material extensible se distingue de la habilitación');
+select pg_temp.chk((select string_agg(nombre, ' | ' order by nombre) from cursos where tipo='Habilitación') = 'Defensa extensible | IE - Taser 10 | IE - Taser 7', 'las habilitaciones ya no llevan "Habilitación" delante');
+select pg_temp.chk((select count(*) from cursos where nombre = 'Extensible' and tipo = 'Material') = 1, 'el material extensible se llama Extensible');
 select pg_temp.chk((select count(*) from cursos) = 14 and (select count(*) from cursos where tipo='Habilitación') = 3 and (select count(*) from cursos where tipo='Material') = 3, 'la lista tiene 3 habilitaciones, 8 formaciones y 3 materiales');
 begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
 select pg_temp.chk(not pg_temp.falla($$insert into formaciones(empleado_id,nombre,fecha) values (4,'Intervención vehículos','2026-03-02')$$), 'puede apuntar un curso de la lista (con tildes)');
@@ -107,8 +107,8 @@ select pg_temp.chk(pg_temp.falla(format($f$update asignaciones set codigo='AP' w
 select pg_temp.chk(pg_temp.falla(format($f$delete from asignaciones where empleado_id=4 and fecha=%L$f$, (now() at time zone 'Europe/Madrid')::date - 3)), 'un agente NO puede borrar un día pasado');
 select pg_temp.chk(pg_temp.falla(format($f$update asignaciones set fecha=%L where empleado_id=4 and fecha=%L$f$, (now() at time zone 'Europe/Madrid')::date - 5, (now() at time zone 'Europe/Madrid')::date - 3)), 'ni mover un día pasado a otra fecha pasada');
 select pg_temp.chk(not pg_temp.falla(format($f$insert into asignaciones(empleado_id,fecha,codigo) values (4,%L,'AP')$f$, (now() at time zone 'Europe/Madrid')::date)), 'sí puede apuntar HOY');
-select pg_temp.chk(not pg_temp.falla(format($f$insert into asignaciones(empleado_id,fecha,codigo) values (4,%L,'AP')$f$, (now() at time zone 'Europe/Madrid')::date + 7)), 'y días futuros');
-select pg_temp.chk(pg_temp.falla(format($f$update asignaciones set fecha=%L where empleado_id=4 and codigo='AP' and fecha=%L$f$, (now() at time zone 'Europe/Madrid')::date - 2, (now() at time zone 'Europe/Madrid')::date + 7)), 'NO puede llevar un día futuro al pasado');
+select pg_temp.chk(not pg_temp.falla(format($f$insert into asignaciones(empleado_id,fecha,codigo) values (4,%L,'AP')$f$, date '2030-06-15')), 'y días futuros');
+select pg_temp.chk(pg_temp.falla(format($f$update asignaciones set fecha=%L where empleado_id=4 and codigo='AP' and fecha=%L$f$, (now() at time zone 'Europe/Madrid')::date - 2, date '2030-06-15')), 'NO puede llevar un día futuro al pasado');
 rollback;
 begin;
 insert into asignaciones(empleado_id,fecha,codigo) values (4,(now() at time zone 'Europe/Madrid')::date - 3,'V1');
@@ -158,3 +158,8 @@ select pg_temp.chk(pg_temp.filas($$select 1 from notas$$) = 0, 'ni un responsabl
 select pg_temp.chk(pg_temp.filas($$select 1 from calendario_tokens$$) = 0, 'ni un responsable ve los enlaces de otros');
 select pg_temp.chk(pg_temp.filas($$update notas set texto='x'$$) = 0, 'ni puede cambiarlas');
 rollback;
+
+\echo == Nombres de cursos
+select pg_temp.chk((select count(*) from cursos where nombre = 'Defensa extensible' and tipo = 'Habilitación') = 1, 'habilitación: Defensa extensible');
+select pg_temp.chk((select count(*) from cursos where nombre = 'Extensible' and tipo = 'Material') = 1, 'material: Extensible');
+select pg_temp.chk((select count(*) from cursos where nombre like 'Extensible (%') = 0, 'ya no queda el nombre entre paréntesis');
