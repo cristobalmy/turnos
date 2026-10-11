@@ -262,3 +262,5 @@ table.res .rnota td{font-size:.75rem;color:var(--suave);text-align:left}
 .mes b{min-width:0;flex:0 1 auto}
 .mes .hoybtn{padding:.3rem .7rem}
 .mesacc{display:flex;gap:.5rem}
+#barraActualizar{position:fixed;top:0;left:0;right:0;z-index:80;display:flex;gap:.8rem;align-items:center;justify-content:center;padding:.55rem .8rem;padding-top:calc(.55rem + env(safe-area-inset-top));background:#2563b8;color:#fff;font-size:.92rem;box-shadow:0 2px 12px #0004}
+#barraActualizar button{background:#fff;color:#0f2a4a;border:0;border-radius:8px;padding:.35rem .8rem;font-weight:700;cursor:pointer}

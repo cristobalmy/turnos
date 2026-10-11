@@ -925,6 +925,21 @@ function vistaCuenta() {
     h("hr"), h("button", { class: "btn sec full", onclick: salir }, "Cerrar sesión"));
 }
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+if ("serviceWorker" in navigator) {
+  // Aviso de versión nueva: cuando el service worker nuevo toma el control (y no es la primera instalación) se enseña una barra para recargar.
+  let habiaControl = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!habiaControl) { habiaControl = true; return; }
+    if (document.getElementById("barraActualizar")) return;
+    document.body.append(h("div", { id: "barraActualizar", role: "status" },
+      h("span", {}, "Hay una versión nueva de la app."),
+      h("button", { onclick: () => location.reload() }, "Actualizar")));
+  });
+  navigator.serviceWorker.register("sw.js").then(reg => {
+    const buscar = () => { reg.update().catch(() => {}); };
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) buscar(); });
+    setInterval(buscar, 30 * 60 * 1000);
+  }).catch(() => {});
+}
 arrancar();
 })();
