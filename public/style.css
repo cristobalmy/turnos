@@ -217,9 +217,9 @@ table.res td.ok{color:var(--verde)}table.res td.bajo{color:var(--rojo);backgroun
 table.res .rp td{font-size:.8rem}table.res .rp small{display:block;color:var(--suave);font-size:.68rem}
 table.res .rl td{text-align:left;padding:.3rem .35rem}
 table.res ul{list-style:none;margin:0;padding:0}
-table.res li{display:grid;grid-template-columns:minmax(0,1fr) 2.7em;align-items:center;gap:.3rem;padding:.12rem 0;font-size:.85rem}
+table.res li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.3rem;padding:.12rem 0;font-size:.85rem}
 table.res li .pn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-table.res li .cod{text-align:center;padding:2px 0;min-width:0}
+table.res li .cod{text-align:center;padding:2px 0;min-width:2.7em}
 
 table.res tbody th,table.res thead th:first-child{position:sticky;left:0;z-index:1}
 table.res tbody th{width:4.6rem}
