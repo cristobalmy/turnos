@@ -18,7 +18,7 @@ button,select,input{font:inherit}
 /* ---- cabecera y pestañas ---- */
 header{background:var(--cab);color:#fff;display:flex;align-items:center;gap:1.2rem;padding:0 1rem;padding-top:env(safe-area-inset-top);height:calc(52px + env(safe-area-inset-top));position:sticky;top:0;z-index:30}
 header .marca{font-size:1.1rem;font-weight:700;display:flex;align-items:center;gap:.5rem}
-header .marca i{background:linear-gradient(#aa151b 0 25%,#f1bf00 25% 75%,#aa151b 75% 100%);color:#0f2a4a;font-weight:800;border-radius:6px;width:30px;height:30px;display:inline-grid;place-items:center;font-style:normal;font-size:.95rem}
+header .marca i{background:linear-gradient(#aa151b 0 25%,#f1bf00 25% 75%,#aa151b 75% 100%);color:#0f2a4a;font-weight:800;border-radius:6px;width:32px;height:32px;display:inline-grid;place-items:center;font-style:normal;font-size:.95rem}
 header .yo{margin-left:auto;font-size:.85rem;opacity:.85;white-space:nowrap}
 nav.tabs{display:flex;gap:.2rem;height:100%}
 nav.tabs button{background:none;border:0;color:#ffffffb0;padding:0 .9rem;cursor:pointer;border-bottom:3px solid transparent;display:flex;align-items:center;gap:.4rem}
