@@ -1,5 +1,5 @@
 // @ts-nocheck
-// Edge Function "avisar": manda una notificación al móvil de todo el equipo cuando alguien cambia un código.
+// Edge Function "avisar": cuando alguien cambia un código, avisa al móvil de la gente de ese mismo distrito.
 // Secretos necesarios (Edge Functions → Secrets): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, AVISO_SECRET.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import webpush from "npm:web-push@3.6.7";
@@ -8,7 +8,7 @@ import webpush from "npm:web-push@3.6.7";
 function fechaCorta(f) { const p = f.split("-"); return Number(p[2]) + "/" + Number(p[1]); }
 
 // cambios: filas de la tabla "cambios"; nombre: id -> nombre. Devuelve { title, body }.
-function construirMensaje(cambios, nombre, actor) {
+function construirMensaje(cambios, nombre, actor, titulo = "Tercio") {
   const grupos = new Map();
   for (const c of cambios) {
     const quito = !c.codigo_despues;
@@ -28,11 +28,18 @@ function construirMensaje(cambios, nombre, actor) {
   }
   const mostrar = lineas.slice(0, 4);
   if (lineas.length > 4) mostrar.push("y " + (lineas.length - 4) + " más");
-  return { title: "Turno D", body: mostrar.join("\n") };
+  return { title: titulo, body: mostrar.join("\n") };
 }
 // ===== FIN LÓGICA DEL MENSAJE =====
 
 // ===== INICIO LÓGICA TERCIO (se prueba por separado) =====
+// Ciclo de 12 días (2 mañanas, 2 tardes, 2 noches, 6 libres). D empezó el 1/1/2026; cada turno A–F va 2 días por detrás del anterior.
+function turnoCiclo(f, letra) {
+  const p = f.split("-").map(Number), n = Math.round((Date.UTC(p[0], p[1] - 1, p[2]) - Date.UTC(2026, 0, 1)) / 864e5);
+  const off = 2 * ("ABCDEF".indexOf(letra || "D") - 3);
+  return "MMTTNNLLLLLL"[(((n - off) % 12) + 12) % 12];
+}
+function diasCiclo(desde, hasta, letra) { const o = {}; for (let f = desde; f <= hasta; f = masDias(f, 1)) o[f] = turnoCiclo(f, letra); return o; }
 function masDias(f, n) { const p = f.split("-").map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)).toISOString().slice(0, 10); }
 function esAus(cods, c) { return !!(c && cods[c] && cods[c].tipo === "Ausencia Justificada"); }
 function esVac(c) { return c === "V1" || c === "V2" || c === "V3"; }
@@ -86,11 +93,13 @@ Deno.serve(async (req) => {
   if (error) return new Response(error.message, { status: 500 });
   if (!cambios || !cambios.length) return new Response("nada que avisar");
 
-  const { data: emps } = await sb.from("empleados").select("id,nombre,orden");
+  const { data: emps } = await sb.from("empleados").select("id,nombre,orden,rol,activo,distrito_id");
   const nombre = Object.fromEntries((emps || []).map((e) => [e.id, e.nombre]));
-  const { data: subs } = await sb.from("push_subs").select("*").neq("empleado_id", hecho_por);
+  const distritoDe = Object.fromEntries((emps || []).map((e) => [e.id, e.distrito_id]));
+  const { data: ds } = await sb.from("distritos").select("*");
+  const distritos = Object.fromEntries((ds || []).map((d) => [d.id, d]));
+  const { data: todasSubs } = await sb.from("push_subs").select("*").neq("empleado_id", hecho_por);
 
-  const msg = construirMensaje(cambios, nombre, hecho_por);
   webpush.setVapidDetails(Deno.env.get("VAPID_SUBJECT"), Deno.env.get("VAPID_PUBLIC_KEY"), Deno.env.get("VAPID_PRIVATE_KEY"));
   const enviar = async (lista, m, tag) => {
     const payload = JSON.stringify({ title: m.title, body: m.body, tag, url: "./" });
@@ -107,12 +116,26 @@ Deno.serve(async (req) => {
     }));
     return n;
   };
-  const enviados = await enviar(subs, msg, "cambio-" + hecho_por);
-
-  // Aviso a los responsables si algún día futuro acaba de superar el tercio
-  let alertas = 0;
-  try { alertas = await alertarTercio(sb, cambios, emps, enviar); } catch (e) { console.error("fallo en la alerta de tercio", e && e.message); }
-  return new Response(`avisados ${enviados} de ${(subs || []).length}; alertas de tercio ${alertas}`);
+  // Cada distrito recibe solo los avisos de su gente
+  const porDistrito = new Map();
+  for (const c of cambios) {
+    const d = distritoDe[c.empleado_id];
+    if (!porDistrito.has(d)) porDistrito.set(d, []);
+    porDistrito.get(d).push(c);
+  }
+  let enviados = 0, alertas = 0, total = 0;
+  for (const [did, lista] of porDistrito) {
+    const dist = distritos[did] || { nombre: "Tercio", letra: "D", turno: "", tercio: 4 };
+    const suyos = (emps || []).filter((e) => e.distrito_id === did && e.activo !== false);
+    const ids = new Set(suyos.map((e) => e.id));
+    const subs = (todasSubs || []).filter((s) => ids.has(s.empleado_id));
+    total += subs.length;
+    const titulo = (dist.nombre + " " + (dist.turno || "")).trim();
+    enviados += await enviar(subs, construirMensaje(lista, nombre, hecho_por, titulo), "cambio-" + hecho_por + "-" + did);
+    // Aviso a los responsables de ese distrito si algún día futuro acaba de superar el tercio
+    try { alertas += await alertarTercio(sb, lista, suyos, dist, enviar); } catch (e) { console.error("fallo en la alerta de tercio", e && e.message); }
+  }
+  return new Response(`avisados ${enviados} de ${total}; alertas de tercio ${alertas}`);
 });
 
 async function leerTodo(consulta) {
@@ -126,14 +149,12 @@ async function leerTodo(consulta) {
   return out;
 }
 
-async function alertarTercio(sb, cambios, emps, enviar) {
+async function alertarTercio(sb, cambios, emps, dist, enviar) {
   const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
   const { data: cd } = await sb.from("codigos").select("codigo,tipo");
   const cods = Object.fromEntries((cd || []).map((c) => [c.codigo, c]));
-  // Tercio del distrito (si todavía no existe la tabla de distritos, 4)
-  let tercio = 4;
-  const { data: dd } = await sb.from("distritos").select("tercio").limit(1);
-  if (dd && dd[0]) tercio = dd[0].tercio;
+  const tercio = dist.tercio || 4;
+  const misIds = emps.map((e) => e.id);
   // Variación por día: +1 si se añade una ausencia justificada, -1 si se quita
   const delta = new Map();
   for (const c of cambios) {
@@ -142,21 +163,19 @@ async function alertarTercio(sb, cambios, emps, enviar) {
     if (d !== 0) delta.set(c.fecha, (delta.get(c.fecha) || 0) + d);
   }
   if (!delta.size) return 0;
-  const { data: resp } = await sb.from("empleados").select("id").eq("rol", "responsable");
-  const ids = (resp || []).map((r) => r.id);
+  const ids = emps.filter((e) => e.rol === "responsable").map((e) => e.id);
+  if (!ids.length) return 0;
   const { data: subs } = await sb.from("push_subs").select("*").in("empleado_id", ids);
   if (!subs || !subs.length) return 0;
   const año = hoy.slice(0, 4);
-  const pasadas = await leerTodo(() => sb.from("asignaciones").select("empleado_id,fecha,codigo").gte("fecha", año + "-01-01").lt("fecha", hoy).order("fecha").order("empleado_id"));
+  const pasadas = await leerTodo(() => sb.from("asignaciones").select("empleado_id,fecha,codigo").in("empleado_id", misIds).gte("fecha", año + "-01-01").lt("fecha", hoy).order("fecha").order("empleado_id"));
   const totales = {};
   for (const r of pasadas) if (esAus(cods, r.codigo)) totales[r.empleado_id] = (totales[r.empleado_id] || 0) + 1;
   let enviadas = 0;
   for (const [f, d] of delta) {
-    const [{ data: dias }, { data: filas }] = await Promise.all([
-      sb.from("dias").select("fecha,turno").gte("fecha", masDias(f, -30)).lte("fecha", masDias(f, 30)),
-      sb.from("asignaciones").select("empleado_id,fecha,codigo").gte("fecha", masDias(f, -30)).lte("fecha", masDias(f, 30)),
-    ]);
-    const mapaDias = Object.fromEntries((dias || []).map((x) => [x.fecha, x.turno]));
+    const { data: filas } = await sb.from("asignaciones").select("empleado_id,fecha,codigo").in("empleado_id", misIds)
+      .gte("fecha", masDias(f, -30)).lte("fecha", masDias(f, 30));
+    const mapaDias = diasCiclo(masDias(f, -30), masDias(f, 30), dist.letra);
     if (!["M", "T", "N"].includes(mapaDias[f])) continue;   // el tercio solo cuenta en días de servicio
     const asig = Object.fromEntries((filas || []).map((x) => [x.empleado_id + "|" + x.fecha, x.codigo]));
     const ahora = contarTercio(emps, cods, asig, f);

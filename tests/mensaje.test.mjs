@@ -15,5 +15,6 @@ eq(construirMensaje([c(4, "2026-10-15", null, "V1"), c(4, "2026-10-13", null, "V
 eq(construirMensaje([c(4, "2026-10-13", null, "V1"), c(4, "2026-10-14", null, "AP")], nombre, 4).body, "Gustavo: V1 el 13/10\nGustavo: AP el 14/10", "dos códigos distintos");
 const muchos = [1, 2, 3, 4, 5, 6].map(i => c(4, "2026-10-1" + i, null, "X" + i));
 eq(construirMensaje(muchos, nombre, 4).body.split("\n").length, 5, "más de 4 líneas se resume");
-eq(construirMensaje([c(4, "2026-10-14", null, "V2")], nombre, 4).title, "Turno D", "título");
+eq(construirMensaje([c(4, "2026-10-14", null, "V2")], nombre, 4, "Usera-Villaverde D2").title, "Usera-Villaverde D2", "el título es el distrito");
+eq(construirMensaje([c(4, "2026-10-14", null, "V2")], nombre, 4).title, "Tercio", "título por defecto");
 process.exit(fallos ? 1 : 0);

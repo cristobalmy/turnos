@@ -36,7 +36,7 @@ Después, `supabase/migracion_012_quitar_automocion.sql` (JUICIO sin descripció
 Después, `supabase/migracion_013_crecimiento.sql` (calendario hasta 2035, distritos, notas privadas y enlace del calendario del móvil).
 Después, `supabase/migracion_016_turnos_y_distritos.sql` (turnos A–F con zona 1/2, ciclo con 6 libres y cada distrito ve y edita solo lo suyo; el administrador, todo). Para deshacerla: `supabase/migracion_016_deshacer.sql`.
 
-Edge Functions (Verify JWT desactivado en ambas): `avisar` (avisos y alerta de tercio a responsables) y `calendario` (enlace .ics personal).
+Edge Functions (Verify JWT desactivado en todas): `avisar` (avisos y alerta de tercio, solo a la gente del mismo distrito), `calendario` (enlace .ics personal, con el ciclo del turno de su distrito) y `alta` (el administrador da de alta personas desde la app: crea la cuenta con contraseña provisional y la ficha en el distrito).
 Pruebas: `bash tests/rls.sh`, `node tests/mensaje.test.mjs`, `node tests/funciones.test.mjs`.
 
 ## Avisos al móvil (opcional)

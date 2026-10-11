@@ -145,6 +145,7 @@ async function arrancar() {
     sb.from("config").select("*"),
   ]);
   if (e.error || c.error) return sinAcceso("No se pudieron cargar los datos. Comprueba la conexión.");
+  S.fichas = e.data;
   S.todos = e.data.filter(x => x.activo);
   S.emps = S.todos;
   S.cods = Object.fromEntries(c.data.map(x => [x.codigo, x]));
@@ -923,7 +924,128 @@ function bloqueAdmin() {
     h("div", { class: "opciones" },
       h("button", { class: "btn sec" + (on ? "" : " act"), onclick: async () => { if (!on) return; ponerLS(ADMIN_KEY, null); ponerLS(DIST_KEY, null); await cambiarDistrito(miDistrito()); } }, "Apagado"),
       h("button", { class: "btn sec" + (on ? " act" : ""), onclick: async () => { if (on) return; ponerLS(ADMIN_KEY, "1"); await cargarDistritos(); pintar(); } }, "Encendido")),
-    on ? h("button", { class: "btn full", onclick: abrirSelectorDistrito }, "Cambiar de turno o distrito") : null];
+    on ? h("button", { class: "btn full", onclick: abrirSelectorDistrito }, "Cambiar de turno o distrito") : null,
+    on ? h("button", { class: "btn sec full", onclick: abrirPersonas }, `Personas de ${S.dist.nombre}`) : null];
+}
+
+// ---------- personas del distrito (solo administrador) ----------
+async function recargarEmpleados() {
+  const { data, error } = await sb.from("empleados").select("*").order("orden");
+  if (error) { toast("No se pudo recargar la lista: " + error.message, 6000); return; }
+  S.fichas = data; S.todos = data.filter(x => x.activo);
+  S.me = S.todos.find(x => x.id === S.me.id) || S.me;
+  const sel = S.dist;
+  S.emps = S.todos.filter(e => e.distrito_id === sel.id);
+}
+function abrirPersonas() {
+  const dlg = h("dialog", { class: "seldist" });
+  const cont = h("div", {});
+  const ROL = { responsable: "Responsable", agente: "Agente" };
+  const dibujar = () => {
+    const del = (S.fichas || []).filter(e => e.distrito_id === S.dist.id);
+    const activas = del.filter(e => e.activo), bajas = del.filter(e => !e.activo);
+    const fila = e => h("button", { class: "btn sec full persona", onclick: () => editarPersona(e, dibujar) },
+      h("span", {}, e.nombre), h("small", {}, (ROL[e.rol] || e.rol) + (e.admin ? " · admin" : "") + (e.hace_pico === false ? " · sin PICO" : "") + (e.pareja_id ? " · pareja: " + nombreEmp(e.pareja_id) : "")));
+    cont.replaceChildren(...[
+      h("p", { class: "sub" }, `${activas.length} persona${activas.length === 1 ? "" : "s"} en ${S.dist.nombre} (${S.dist.turno}). Pulsa en alguien para cambiar sus datos o darle de baja.`),
+      h("button", { class: "btn full", onclick: () => editarPersona(null, dibujar) }, "+ Dar de alta a una persona"),
+      h("div", { class: "distlista" }, activas.map(fila)),
+      bajas.length ? [h("h4", {}, "De baja"), h("div", { class: "distlista" }, bajas.map(e => h("button", { class: "btn sec full persona baja", onclick: async ev => {
+        if (!confirm(`¿Volver a dar de alta a ${e.nombre}? Podrá entrar otra vez con su correo y su contraseña.`)) return;
+        ev.currentTarget.disabled = true;
+        const { error } = await sb.from("empleados").update({ activo: true }).eq("id", e.id);
+        if (error) { toast("No se pudo: " + error.message, 6000); return; }
+        await recargarEmpleados(); dibujar(); pintar();
+      } }, h("span", {}, e.nombre), h("small", {}, "Reactivar"))))] : null].flat().filter(Boolean));
+  };
+  dibujar();
+  dlg.append(h("h3", {}, "Personas"), cont, h("div", { class: "fila" }, h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cerrar")));
+  dlg.addEventListener("close", () => { dlg.remove(); pintar(); });
+  document.body.append(dlg); dlg.showModal();
+}
+const claveProvisional = () => { const L = "abcdefghjkmnpqrstuvwxyz", N = "23456789", r = n => crypto.getRandomValues(new Uint32Array(1))[0] % n;
+  return Array.from({ length: 6 }, () => L[r(L.length)]).join("") + Array.from({ length: 3 }, () => N[r(N.length)]).join(""); };
+async function ponerPareja(id, parejaId) {
+  // La pareja es de ida y vuelta: si A es pareja de B, B es pareja de A. Se deshacen las anteriores.
+  const f = id => (S.fichas || []).find(e => e.id === id) || {};
+  const antes = f(id).pareja_id || null;
+  if (antes === parejaId) return null;
+  const cambios = [];
+  if (antes && f(antes).pareja_id === id) cambios.push([antes, null]);
+  if (parejaId) { const suya = f(parejaId).pareja_id; if (suya && suya !== id) cambios.push([suya, null]); cambios.push([parejaId, id]); }
+  cambios.push([id, parejaId]);
+  for (const [a, b] of cambios) { const { error } = await sb.from("empleados").update({ pareja_id: b }).eq("id", a); if (error) return error; }
+  return null;
+}
+function editarPersona(emp, alVolver) {
+  const nueva = !emp;
+  const dlg = h("dialog", { class: "seldist" });
+  const nombre = h("input", { type: "text", maxlength: "40", value: emp ? emp.nombre : "", placeholder: "Como aparecerá en el calendario" });
+  const email = h("input", { type: "email", placeholder: "correo@ejemplo.com", autocomplete: "off" });
+  const clave = h("input", { type: "text", value: claveProvisional(), autocomplete: "off" });
+  const rol = h("select", {}, [["agente", "Agente"], ["responsable", "Responsable"]].map(([v, t]) => h("option", { value: v, selected: emp ? emp.rol === v : v === "agente" }, t)));
+  const pico = h("input", { type: "checkbox", checked: emp ? emp.hace_pico !== false : true });
+  const otros = S.todos.filter(e => e.distrito_id === S.dist.id && (!emp || e.id !== emp.id));
+  const pareja = h("select", {}, h("option", { value: "" }, "— Sin pareja —"), otros.map(e => h("option", { value: e.id, selected: emp && emp.pareja_id === e.id }, e.nombre)));
+  const err = h("div", { class: "error" });
+  const guardarP = async ev => {
+    const btn = ev.currentTarget, n = nombre.value.trim();
+    if (!n) { err.textContent = "Escribe el nombre."; return; }
+    btn.disabled = true; err.textContent = nueva ? "Creando la cuenta…" : "Guardando…";
+    let id = emp && emp.id, cuentaNueva = true;
+    if (nueva) {
+      const { data, error } = await sb.functions.invoke("alta", { body: { nombre: n, email: email.value.trim(), clave: clave.value, rol: rol.value, hace_pico: pico.checked, distrito_id: S.dist.id } });
+      let msg = data && data.error;
+      if (error) { try { msg = (await error.context.json()).error; } catch (e) { msg = msg || error.message; } }
+      if (msg || !data) { btn.disabled = false; err.textContent = msg || "No se pudo dar de alta."; return; }
+      id = data.empleado.id; cuentaNueva = data.cuentaNueva;
+    } else {
+      const { error } = await sb.from("empleados").update({ nombre: n, rol: rol.value, hace_pico: pico.checked }).eq("id", id);
+      if (error) { btn.disabled = false; err.textContent = /duplicate|unique/i.test(error.message) ? "Ya hay alguien con ese nombre en este distrito." : "No se pudo guardar: " + error.message; return; }
+    }
+    await recargarEmpleados();
+    const e2 = await ponerPareja(id, pareja.value ? +pareja.value : null);
+    if (e2) toast("Guardado, pero no se pudo poner la pareja: " + e2.message, 6000);
+    await recargarEmpleados();
+    dlg.close(); if (alVolver) alVolver();
+    if (nueva) avisoAlta(n, email.value.trim().toLowerCase(), clave.value, cuentaNueva);
+  };
+  const baja = emp && emp.id !== S.me.id ? h("button", { class: "btn sec", onclick: async ev => {
+    if (!confirm(`¿Dar de baja a ${emp.nombre}? Dejará de poder entrar y de salir en el calendario. Sus días apuntados se conservan y se puede reactivar.`)) return;
+    ev.currentTarget.disabled = true;
+    await ponerPareja(emp.id, null);
+    const { error } = await sb.from("empleados").update({ activo: false }).eq("id", emp.id);
+    if (error) { ev.currentTarget.disabled = false; err.textContent = "No se pudo: " + error.message; return; }
+    await recargarEmpleados(); dlg.close(); if (alVolver) alVolver();
+  } }, "Dar de baja") : null;
+  dlg.append(
+    h("h3", {}, nueva ? "Dar de alta" : emp.nombre), h("p", { class: "sub" }, `${S.dist.nombre} · ${S.dist.turno}`),
+    h("div", { class: "nuevodist", style: "border:0;margin:0;padding:0" },
+      h("label", {}, "Nombre", nombre),
+      nueva ? [h("label", {}, "Correo (con el que entrará)", email), h("label", {}, "Contraseña provisional", clave),
+        h("small", { class: "det" }, "Se la das tú. La primera vez que entre, la app le pedirá que elija la suya.")] : h("small", { class: "det" }, emp.email || ""),
+      h("label", {}, "Papel", rol),
+      h("label", {}, "Pareja (binomio)", pareja),
+      h("label", { class: "check" }, pico, " Hace PICO")),
+    err,
+    h("div", { class: "fila" }, baja || h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cancelar"),
+      h("button", { class: "btn", onclick: guardarP }, nueva ? "Dar de alta" : "Guardar")));
+  dlg.addEventListener("close", () => dlg.remove());
+  document.body.append(dlg); dlg.showModal(); nombre.focus();
+}
+function avisoAlta(nombre, email, clave, cuentaNueva) {
+  const texto = cuentaNueva
+    ? `Hola ${nombre}, ya tienes acceso a Tercio.\nEntra en ${location.origin} con:\nCorreo: ${email}\nContraseña provisional: ${clave}\nAl entrar te pedirá que elijas tu propia contraseña.`
+    : `Hola ${nombre}, ya tienes acceso a Tercio en ${location.origin}. Entra con tu correo (${email}) y tu contraseña de siempre.`;
+  const dlg = h("dialog", {});
+  dlg.append(h("h3", {}, "Alta hecha ✔"),
+    h("p", {}, cuentaNueva ? "Pásale estos datos para que pueda entrar:" : "Ese correo ya tenía cuenta, así que conserva su contraseña. Pásale este mensaje:"),
+    h("pre", { class: "mensajeAlta" }, texto),
+    h("div", { class: "fila" },
+      h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cerrar"),
+      h("button", { class: "btn", onclick: async ev => { try { await navigator.clipboard.writeText(texto); ev.currentTarget.textContent = "Copiado ✔"; } catch (e) { toast("No se pudo copiar; selecciona el texto a mano"); } } }, "Copiar mensaje")));
+  dlg.addEventListener("close", () => { dlg.remove(); pintar(); });
+  document.body.append(dlg); dlg.showModal();
 }
 
 // ---------- copia de seguridad (solo administrador) ----------

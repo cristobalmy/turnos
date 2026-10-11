@@ -277,3 +277,7 @@ dialog.seldist .opciones{flex-wrap:wrap}
 .nuevodist label{display:block;margin:.5rem 0}
 .nuevodist input{width:100%}
 .dosnum{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.persona{display:flex;justify-content:space-between;align-items:center;gap:.5rem;text-align:left}
+.persona small{opacity:.7;font-weight:400;font-size:.78rem}
+.persona.baja{opacity:.7}
+.mensajeAlta{white-space:pre-wrap;background:var(--gris);border-radius:10px;padding:.7rem;font-size:.85rem;user-select:all}

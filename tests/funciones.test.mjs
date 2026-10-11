@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 const trozo = (ruta, ini, fin) => readFileSync(new URL(ruta, import.meta.url), "utf8").split(ini)[1].split(fin)[0];
 const av = trozo("../supabase/functions/avisar/index.ts", "// ===== INICIO LÓGICA TERCIO (se prueba por separado) =====", "// ===== FIN LÓGICA TERCIO =====");
-const { avisoTercio, recomendarQuitar } = new Function('function fechaCorta(f){const p=f.split("-");return Number(p[2])+"/"+Number(p[1]);}' + av + "; return { avisoTercio, recomendarQuitar };")();
+const { avisoTercio, recomendarQuitar, turnoCiclo, diasCiclo } = new Function('function fechaCorta(f){const p=f.split("-");return Number(p[2])+"/"+Number(p[1]);}' + av + "; return { avisoTercio, recomendarQuitar, turnoCiclo, diasCiclo };")();
 const ics = trozo("../supabase/functions/calendario/index.ts", "// ===== INICIO LÓGICA ICS (se prueba por separado) =====", "// ===== FIN LÓGICA ICS =====");
 const { construirIcs } = new Function(ics + "; return { construirIcs };")();
 let fallos = 0;
@@ -36,4 +36,20 @@ eq(calendario.match(/SUMMARY:.*/g), ["SUMMARY:Mañana", "SUMMARY:V1 · Vacacione
 eq(calendario.includes("DTSTART;VALUE=DATE:20261020\r\nDTEND;VALUE=DATE:20261021"), true, "evento de día completo");
 eq(calendario.startsWith("BEGIN:VCALENDAR\r\n") && calendario.endsWith("END:VCALENDAR\r\n"), true, "estructura del calendario");
 eq(new Set(calendario.match(/UID:.*/g)).size, 4, "cada evento tiene un identificador distinto");
+eq(["C", "D", "E"].map(l => turnoCiclo("2026-10-18", l)), ["N", "T", "M"], "ciclo: cuando D hace tarde, C hace noche y E mañana");
+eq(["E", "F"].map(l => turnoCiclo("2026-10-20", l)), ["T", "M"], "ciclo: cuando E hace tarde, F hace mañana");
+eq(["F", "A"].map(l => turnoCiclo("2026-10-22", l)), ["T", "M"], "ciclo: cuando F hace tarde, A hace mañana");
+eq(Object.values(diasCiclo("2026-01-01", "2026-01-12", "D")).join(""), "MMTTNNLLLLLL", "ciclo D desde el 1/1/2026 con 6 libres");
+const ics2 = trozo("../supabase/functions/calendario/index.ts", "// ===== INICIO LÓGICA ICS (se prueba por separado) =====", "// ===== FIN LÓGICA ICS =====");
+const cal2 = new Function(ics2 + "; return { diasCiclo };")();
+eq(cal2.diasCiclo("2026-10-18", "2026-10-19", "E"), [{ fecha: "2026-10-18", turno: "M" }, { fecha: "2026-10-19", turno: "M" }], "el calendario del móvil sigue el turno del distrito");
+const al = trozo("../supabase/functions/alta/index.ts", "// ===== INICIO LÓGICA ALTA (se prueba por separado) =====", "// ===== FIN LÓGICA ALTA =====");
+const { validarAlta } = new Function(al + "; return { validarAlta };")();
+eq(validarAlta({ nombre: " Laura ", email: " Laura@Gmail.com ", clave: "abcdefgh", distrito_id: 2 }).datos,
+  { nombre: "Laura", email: "laura@gmail.com", clave: "abcdefgh", rol: "agente", distrito_id: 2, hace_pico: true }, "alta: limpia nombre y correo; agente y con PICO por defecto");
+eq(validarAlta({ nombre: "Laura", email: "laura@gmail.com", clave: "corta", distrito_id: 2 }).error, "La contraseña provisional debe tener al menos 8 caracteres.", "alta: contraseña demasiado corta");
+eq(validarAlta({ nombre: "Laura", email: "lauragmail.com", clave: "abcdefgh", distrito_id: 2 }).error, "El correo no es válido.", "alta: correo mal escrito");
+eq(validarAlta({ nombre: "", email: "l@g.es", clave: "abcdefgh", distrito_id: 2 }).error, "Escribe el nombre (máximo 40 letras).", "alta: sin nombre");
+eq(validarAlta({ nombre: "L", email: "l@g.es", clave: "abcdefgh" }).error, "Falta el distrito.", "alta: sin distrito");
+eq(validarAlta({ nombre: "L", email: "l@g.es", clave: "abcdefgh", distrito_id: 1, rol: "admin" }).datos.rol, "agente", "alta: nadie puede colarse como administrador");
 process.exit(fallos ? 1 : 0);

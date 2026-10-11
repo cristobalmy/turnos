@@ -31,6 +31,13 @@ function construirIcs(nombre, dias, asig, cods, ahora) {
   l.push("END:VCALENDAR");
   return l.join("\r\n") + "\r\n";
 }
+// Ciclo de 12 días (2 mañanas, 2 tardes, 2 noches, 6 libres). D empezó el 1/1/2026; cada turno A–F va 2 días por detrás del anterior.
+function turnoCiclo(f, letra) {
+  const p = f.split("-").map(Number), n = Math.round((Date.UTC(p[0], p[1] - 1, p[2]) - Date.UTC(2026, 0, 1)) / 864e5);
+  const off = 2 * ("ABCDEF".indexOf(letra || "D") - 3);
+  return "MMTTNNLLLLLL"[(((n - off) % 12) + 12) % 12];
+}
+function diasCiclo(desde, hasta, letra) { const o = []; for (let f = desde; f <= hasta; f = masDias(f, 1)) o.push({ fecha: f, turno: turnoCiclo(f, letra) }); return o; }
 // ===== FIN LÓGICA ICS =====
 
 Deno.serve(async (req) => {
@@ -39,7 +46,8 @@ Deno.serve(async (req) => {
   const sb = createClient(Deno.env.get("SUPABASE_URL"), Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
   const { data: tk } = await sb.from("calendario_tokens").select("empleado_id").eq("token", token).maybeSingle();
   if (!tk) return new Response("enlace no válido", { status: 404 });
-  const { data: emp } = await sb.from("empleados").select("nombre").eq("id", tk.empleado_id).single();
+  const { data: emp } = await sb.from("empleados").select("nombre,distrito_id").eq("id", tk.empleado_id).single();
+  const { data: dist } = await sb.from("distritos").select("letra").eq("id", emp.distrito_id).maybeSingle();
   const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
   const desde = masDias(hoy, -60), hasta = masDias(hoy, 730);
   const leer = async (tabla, cols, extra) => {
@@ -54,7 +62,7 @@ Deno.serve(async (req) => {
     }
     return out;
   };
-  const dias = await leer("dias", "fecha,turno");
+  const dias = diasCiclo(desde, hasta, (dist && dist.letra) || "D");
   const filas = await leer("asignaciones", "fecha,codigo", (q) => q.eq("empleado_id", tk.empleado_id));
   const { data: cd } = await sb.from("codigos").select("codigo,descripcion,cuenta_como_trabajo");
   const cods = Object.fromEntries((cd || []).map((c) => [c.codigo, c]));
