@@ -980,7 +980,7 @@ function abrirPersonas() {
     const fila = e => h("div", { class: "persona" },
       h("button", { class: "pcol", title: "Editar datos, baja o borrar", onclick: () => editarPersona(e, dibujar) },
         h("b", {}, e.nombre), h("small", { class: "correo" }, e.email || "sin correo"),
-        h("small", {}, (ROL[e.rol] || e.rol) + (e.admin ? " · admin" : "") + (e.hace_pico === false ? " · sin PICO" : "") + (e.pareja_id ? " · pareja: " + nombreEmp(e.pareja_id) : ""))),
+        h("small", {}, (ROL[e.rol] || e.rol) + (e.admin ? " · admin" : "") + (e.hace_pico === false ? " · sin PICO" : "") + (e.pareja_id ? " · binomio: " + nombreEmp(e.pareja_id) : ""))),
       e.id === S.me.id ? null : h("button", { class: "btn mini " + (e.rol === "responsable" ? "sec" : ""), onclick: ev => cambiarRol(e, ev.currentTarget) }, e.rol === "responsable" ? "Quitar responsable" : "Hacer responsable"));
     cont.replaceChildren(...[
       h("p", { class: "sub" }, `${activas.length} persona${activas.length === 1 ? "" : "s"} en ${S.dist.nombre} (${S.dist.turno}). Pulsa en alguien para cambiar sus datos, darle de baja o borrarlo.`),
@@ -1022,7 +1022,7 @@ function editarPersona(emp, alVolver) {
   const rol = h("select", {}, [["agente", "Agente"], ["responsable", "Responsable"]].map(([v, t]) => h("option", { value: v, selected: emp ? emp.rol === v : v === "agente" }, t)));
   const pico = h("input", { type: "checkbox", checked: emp ? emp.hace_pico !== false : true });
   const otros = S.todos.filter(e => e.distrito_id === S.dist.id && (!emp || e.id !== emp.id));
-  const pareja = h("select", {}, h("option", { value: "" }, "— Sin pareja —"), otros.map(e => h("option", { value: e.id, selected: emp && emp.pareja_id === e.id }, e.nombre)));
+  const pareja = h("select", {}, h("option", { value: "" }, "— Sin binomio —"), otros.map(e => h("option", { value: e.id, selected: emp && emp.pareja_id === e.id }, e.nombre)));
   const err = h("div", { class: "error" });
   const guardarP = async ev => {
     const btn = ev.currentTarget, n = nombre.value.trim();
@@ -1041,7 +1041,7 @@ function editarPersona(emp, alVolver) {
     }
     await recargarEmpleados();
     const e2 = await ponerPareja(id, pareja.value ? +pareja.value : null);
-    if (e2) toast("Guardado, pero no se pudo poner la pareja: " + e2.message, 6000);
+    if (e2) toast("Guardado, pero no se pudo poner el binomio: " + e2.message, 6000);
     await recargarEmpleados();
     dlg.close(); if (alVolver) alVolver();
     if (nueva) avisoAlta(n, email.value.trim().toLowerCase(), clave.value, cuentaNueva);
@@ -1082,7 +1082,7 @@ function editarPersona(emp, alVolver) {
       nueva ? [h("label", {}, "Correo (con el que entrará)", email), h("label", {}, "Contraseña provisional", clave),
         h("small", { class: "det" }, "Se la das tú. La primera vez que entre, la app le pedirá que elija la suya.")] : h("small", { class: "det" }, emp.email || ""),
       h("label", {}, "Papel", rol),
-      h("label", {}, "Pareja (binomio)", pareja),
+      h("label", {}, "Binomio", pareja),
       h("label", { class: "check" }, pico, " Hace PICO")),
     err,
     emp ? h("div", { class: "fila peligros" }, baja, borrar) : null,
