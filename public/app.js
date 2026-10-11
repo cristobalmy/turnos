@@ -437,7 +437,7 @@ function panelBloque(titulo, k, clase) {
 function vistaResumen() {
   const k = bloqueActual(), hoy = hoyStr(), fs = bloqueFechas(k);
   return h("div", { class: "resumenPag" },
-    panelBloque(fs.includes(hoy) ? "Turno actual" : "Turno que acaba de pasar", k, "actual"),
+    panelBloque(fs.includes(hoy) ? "Turno actual" : "Turno anterior", k, "actual"),
     panelBloque("Turno siguiente", k + 1, "siguiente"));
 }
 

@@ -207,3 +207,7 @@ select pg_temp.chk(not pg_temp.falla($$insert into asignaciones(empleado_id,fech
 select pg_temp.chk(not pg_temp.falla($$insert into distritos(nombre, letra, zona) values ('Otro', 'A', 2)$$), 'y crear distritos');
 select pg_temp.chk(pg_temp.falla($$insert into distritos(nombre, letra, zona) values ('Malo', 'G', 3)$$), 'solo con turnos A–F y zona 1 o 2');
 rollback;
+
+\echo == Migración 017: aviso del PICO
+select pg_temp.chk((select count(*) from cron.job where jobname = 'aviso-pico' and schedule = '0 18,19 * * *') = 1, 'el aviso del PICO queda programado una sola vez');
+select pg_temp.chk((select command like '%functions/v1/pico%' and command like '%secreto-de-prueba%' from cron.job where jobname = 'aviso-pico'), 'llama a la función pico con el secreto de los avisos');

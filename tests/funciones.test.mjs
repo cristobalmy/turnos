@@ -52,4 +52,18 @@ eq(validarAlta({ nombre: "Laura", email: "lauragmail.com", clave: "abcdefgh", di
 eq(validarAlta({ nombre: "", email: "l@g.es", clave: "abcdefgh", distrito_id: 2 }).error, "Escribe el nombre (máximo 40 letras).", "alta: sin nombre");
 eq(validarAlta({ nombre: "L", email: "l@g.es", clave: "abcdefgh" }).error, "Falta el distrito.", "alta: sin distrito");
 eq(validarAlta({ nombre: "L", email: "l@g.es", clave: "abcdefgh", distrito_id: 1, rol: "admin" }).datos.rol, "agente", "alta: nadie puede colarse como administrador");
+const pc = trozo("../supabase/functions/pico/index.ts", "// ===== INICIO LÓGICA PICO (se prueba por separado) =====", "// ===== FIN LÓGICA PICO =====");
+const { avisoPico } = new Function(pc + "; return { avisoPico };")();
+const dD = { nombre: "Usera-Villaverde", letra: "D", turno: "D2" };
+const cP = { V1: { cuenta_como_trabajo: false }, AP: { cuenta_como_trabajo: false }, PICO: { cuenta_como_trabajo: true }, DESP: { cuenta_como_trabajo: true } };
+const ep = [1, 2, 3, 4, 5, 6, 7].map(i => ({ id: i, nombre: "P" + i, orden: i, hace_pico: i !== 1, pareja_id: i % 2 ? i + 1 : i - 1 }));
+ep[6].pareja_id = null;
+// 20/10/2026: D hace noche. 7 personas trabajan → impar
+eq(avisoPico(dD, "2026-10-20", ep, {}, cP, {}), { title: "PICO mañana · Usera-Villaverde D2", body: "Mañana martes 20/10 (noche) trabajan 7: hace falta PICO. No hay ningún candidato libre con su binomio ausente." }, "pico: impar sin candidatos lo dice");
+eq(avisoPico(dD, "2026-10-20", ep, { 2: "V1" }, cP, {}), null, "pico: con número par no avisa");
+eq(avisoPico(dD, "2026-10-20", ep, { 3: "V1", 5: "AP" }, cP, { 4: "2026-09-01", 6: "2025-12-20" }).body, "Mañana martes 20/10 (noche) trabajan 5: hace falta PICO. Recomendado: P6 (luego P4)", "pico: recomienda a quien lleva más tiempo sin PICO, aunque fuera el año anterior");
+eq(avisoPico(dD, "2026-10-20", ep, { 3: "V1", 5: "AP" }, cP, { 6: "2026-09-01" }).body.endsWith("Recomendado: P4 (luego P6)"), true, "pico: quien nunca lo ha hecho va primero");
+eq(avisoPico(dD, "2026-10-20", ep, { 3: "V1", 5: "AP", 2: "V1", 4: "PICO" }, cP, {}), null, "pico: si ya está puesto no avisa");
+eq(avisoPico(dD, "2026-10-20", ep, { 2: "V1", 3: "V1", 7: "DESP" }, cP, {}).body.endsWith("trabajan 5: hace falta PICO. Recomendado: P4"), true, "pico: DESP cuenta como que trabaja, no como PICO; y quien no hace PICO no sale");
+eq(avisoPico(dD, "2026-10-22", ep, {}, cP, {}), null, "pico: día libre del ciclo no avisa");
 process.exit(fallos ? 1 : 0);
