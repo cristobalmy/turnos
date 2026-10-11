@@ -264,3 +264,16 @@ table.res .rnota td{font-size:.75rem;color:var(--suave);text-align:left}
 .mesacc{display:flex;gap:.5rem}
 #barraActualizar{position:fixed;top:0;left:0;right:0;z-index:80;display:flex;gap:.8rem;align-items:center;justify-content:center;padding:.55rem .8rem;padding-top:calc(.55rem + env(safe-area-inset-top));background:#2563b8;color:#fff;font-size:.92rem;box-shadow:0 2px 12px #0004}
 #barraActualizar button{background:#fff;color:#0f2a4a;border:0;border-radius:8px;padding:.35rem .8rem;font-weight:700;cursor:pointer}
+
+/* modo administrador */
+header button.marca{background:none;border:0;color:inherit;font:inherit;font-size:1.1rem;font-weight:700;cursor:pointer;padding:0;text-align:left}
+header .marca .adm{font-size:.62rem;font-weight:800;letter-spacing:.04em;background:#f1bf00;color:#0f2a4a;border-radius:4px;padding:.12rem .35rem;margin-left:.15rem}
+dialog.seldist h4{margin:.9rem 0 .4rem}
+dialog.seldist .opciones{flex-wrap:wrap}
+.distlista{display:grid;gap:.4rem}
+.distlista small{opacity:.7;font-weight:400}
+.nuevodist{margin-top:1rem;border-top:1px solid var(--borde, #ddd);padding-top:.7rem}
+.nuevodist summary{cursor:pointer;font-weight:600;margin-bottom:.6rem}
+.nuevodist label{display:block;margin:.5rem 0}
+.nuevodist input{width:100%}
+.dosnum{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}

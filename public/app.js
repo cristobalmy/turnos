@@ -40,8 +40,8 @@ const pad = n => String(n).padStart(2, "0");
 const fechaStr = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
 const fechaCorta = f => { const [, m, d] = f.split("-"); return `${+d}/${+m}`; };
 const hoyStr = () => { const t = new Date(); return fechaStr(t.getFullYear(), t.getMonth(), t.getDate()); };
-const nombreEmp = id => (S.emps.find(e => e.id === id) || {}).nombre || "?";
-const esResp = () => S.me && S.me.rol === "responsable";
+const nombreEmp = id => ((S.todos || S.emps).find(e => e.id === id) || {}).nombre || "?";
+const esResp = () => S.me && (S.me.rol === "responsable" || !!S.me.admin);
 function toast(msg, ms = 5000) {
   const t = h("div", { class: "toast" }, msg);
   document.getElementById("toasts").append(t);
@@ -50,6 +50,45 @@ function toast(msg, ms = 5000) {
 // Grupo visual de un código: los que solo ponen los responsables (PICO, DESP) son "modificadores".
 const grupoDe = c => { const x = S.cods[c]; if (!x) return "e"; if (x.solo_responsables) return "m"; return x.tipo === "Ausencia Justificada" ? "a" : x.tipo === "Tipo trabajo" ? "t" : "e"; };
 const claseTipo = c => ({ a: "t-Ausencia", t: "t-Trabajo", m: "t-Mod", e: "t-Especial" })[grupoDe(c)];
+
+// ---------- turnos A–F y distrito que se está viendo ----------
+// Ciclo de 12 días: 2 mañanas, 2 tardes, 2 noches y 6 libres. El turno D empezó el ciclo el 1/1/2026
+// y cada turno lo empieza 2 días después que el anterior (cuando D hace tardes, E hace mañanas).
+const CICLO = "MMTTNNLLLLLL", LETRAS = "ABCDEF";
+const desfase = letra => 2 * (LETRAS.indexOf(letra || "D") - 3);
+const diasDesde2026 = f => { const [y, m, d] = f.split("-").map(Number); return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(2026, 0, 1)) / 864e5); };
+const turnoCiclo = (f, letra = S.dist && S.dist.letra) => CICLO[(((diasDesde2026(f) - desfase(letra)) % 12) + 12) % 12];
+function diasRango(desde, hasta) {
+  const o = {};
+  for (let f = desde; f <= hasta; f = nextDay(f)) o[f] = turnoCiclo(f);
+  return o;
+}
+const ADMIN_KEY = "modoAdmin", DIST_KEY = "distritoAdmin";
+const leerLS = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const ponerLS = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} };
+const modoAdmin = () => !!(S.me && S.me.admin && leerLS(ADMIN_KEY) === "1");
+const miDistrito = () => (S.distritos || []).find(d => d.id === S.me.distrito_id)
+  || { id: S.me.distrito_id, nombre: "Usera-Villaverde", letra: "D", zona: 2, turno: "D2", minimo_operativo: 6, tercio: 4 };
+function ponerDistrito(d) {
+  S.dist = Object.assign({ letra: "D", zona: 2 }, d);
+  S.dist.turno = S.dist.letra + S.dist.zona;
+  S.emps = (S.todos || []).filter(e => e.distrito_id === S.dist.id);
+  S.minimo = S.dist.minimo_operativo || 6; S.tercio = S.dist.tercio || 4;
+  const estoy = S.emps.some(e => e.id === S.me.id);
+  S.infEmp = estoy ? S.me.id : (S.emps[0] || {}).id || 0;
+  S.abiertas = new Set(estoy ? [S.me.id] : []);
+  S.fsel = null; S.yaScroll = false;
+}
+async function cargarDistritos() {
+  const { data, error } = await sb.from("distritos").select("*").order("nombre");
+  if (!error) S.distritos = data;
+}
+async function cambiarDistrito(d) {
+  ponerDistrito(d);
+  ponerLS(DIST_KEY, d.id === S.me.distrito_id ? null : String(d.id));
+  await Promise.all([cargarMes(), cargarResumen()]);
+  pintar();
+}
 
 // ---------- acceso ----------
 function pantallaLogin(msg) {
@@ -106,19 +145,19 @@ async function arrancar() {
     sb.from("config").select("*"),
   ]);
   if (e.error || c.error) return sinAcceso("No se pudieron cargar los datos. Comprueba la conexión.");
-  S.emps = e.data.filter(x => x.activo);
+  S.todos = e.data.filter(x => x.activo);
+  S.emps = S.todos;
   S.cods = Object.fromEntries(c.data.map(x => [x.codigo, x]));
   const mc = (cfg.data || []).find(x => x.clave === "minimo_operativo");
   if (mc) S.minimo = +mc.valor || 6;
   const tc = (cfg.data || []).find(x => x.clave === "tercio");
   if (tc) S.tercio = +tc.valor || 4;
-  S.me = S.emps.find(x => (x.email || "").toLowerCase() === email) || null;
+  S.me = S.todos.find(x => (x.email || "").toLowerCase() === email) || null;
   if (!S.me) return sinAcceso("Tu cuenta no está autorizada en Tercio. Habla con un responsable.");
   if (S.me.clave_cambiada === false) return pantallaNuevaClave(true);
-  if (S.me.distrito_id) {
-    const dd = await sb.from("distritos").select("minimo_operativo,tercio").eq("id", S.me.distrito_id).maybeSingle();
-    if (dd.data) { S.minimo = dd.data.minimo_operativo || S.minimo; S.tercio = dd.data.tercio || S.tercio; }
-  }
+  await cargarDistritos();
+  const guardado = modoAdmin() && (S.distritos || []).find(d => String(d.id) === leerLS(DIST_KEY));
+  ponerDistrito(Object.assign({ minimo_operativo: S.minimo, tercio: S.tercio }, guardado || miDistrito()));
   const t = new Date(); S.y = t.getFullYear(); S.m = t.getMonth(); S.sel = hoyStr();
   const [r1, r2, pc] = await Promise.all([
     sb.from("dias").select("fecha").order("fecha").limit(1),
@@ -141,23 +180,17 @@ async function salir() { await sb.auth.signOut(); if (S.canal) sb.removeChannel(
 // ---------- datos del mes ----------
 async function cargarMes() {
   const desde = fechaStr(S.y, S.m, 1), hasta = fechaStr(S.y, S.m, new Date(S.y, S.m + 1, 0).getDate());
-  const [d, a] = await Promise.all([
-    sb.from("dias").select("fecha,turno").gte("fecha", desde).lte("fecha", hasta),
-    sb.from("asignaciones").select("empleado_id,fecha,codigo").gte("fecha", desde).lte("fecha", hasta),
-  ]);
-  if (d.error || a.error) { toast("Error al cargar el mes"); return; }
-  S.dias = Object.fromEntries(d.data.map(x => [x.fecha, x.turno]));
+  const a = await sb.from("asignaciones").select("empleado_id,fecha,codigo").gte("fecha", desde).lte("fecha", hasta);
+  if (a.error) { toast("Error al cargar el mes"); return; }
+  S.dias = diasRango(desde, hasta);
   S.asig = Object.fromEntries(a.data.map(x => [x.empleado_id + "|" + x.fecha, x.codigo]));
   cargarNotas(desde, hasta).then(() => { if (S.vista === "cal") pintar(); });
   // Hoy y mañana también (para la recomendación de pico), aunque se esté viendo otro mes.
   const t = new Date(), h0 = fechaStr(t.getFullYear(), t.getMonth(), t.getDate()), t2 = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1), h1 = fechaStr(t2.getFullYear(), t2.getMonth(), t2.getDate());
   if (!(h0 >= desde && h1 <= hasta)) {
-    const [d2, a2] = await Promise.all([
-      sb.from("dias").select("fecha,turno").gte("fecha", h0).lte("fecha", h1),
-      sb.from("asignaciones").select("empleado_id,fecha,codigo").gte("fecha", h0).lte("fecha", h1),
-    ]);
-    if (!d2.error && !a2.error) {
-      for (const x of d2.data) if (!(x.fecha in S.dias)) S.dias[x.fecha] = x.turno;
+    const a2 = await sb.from("asignaciones").select("empleado_id,fecha,codigo").gte("fecha", h0).lte("fecha", h1);
+    if (!a2.error) {
+      for (const [f, t] of Object.entries(diasRango(h0, h1))) if (!(f in S.dias)) S.dias[f] = t;
       for (const x of a2.data) { const k = x.empleado_id + "|" + x.fecha; if (!(k in S.asig)) S.asig[k] = x.codigo; }
     }
   }
@@ -189,7 +222,7 @@ function suscribir() {
     })
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "cambios" }, p => {
       const c = p.new;
-      if (c.hecho_por === S.me.id) return;
+      if (c.hecho_por === S.me.id || !S.emps.some(e => e.id === c.empleado_id)) return;
       const quien = nombreEmp(c.hecho_por), de = nombreEmp(c.empleado_id);
       const que = c.codigo_despues ? c.codigo_despues : "quitado " + (c.codigo_antes || "");
       toast(`${quien}${c.hecho_por === c.empleado_id ? "" : " → " + de}: ${que} el ${fechaCorta(c.fecha)}`);
@@ -252,14 +285,17 @@ const DLARGO = ["domingo","lunes","martes","miércoles","jueves","viernes","sáb
 function cabecera() {
   const b = (v, txt) => h("button", { class: S.vista === v ? "on" : "", onclick: () => { S.vista = v; pintar(); } }, icono(v), txt);
   return h("header", {},
-    h("div", { class: "marca" }, h("i", {}, "D2"), "Usera-Villaverde"),
+    modoAdmin()
+      ? h("button", { class: "marca admin", title: "Cambiar de turno o distrito", onclick: abrirSelectorDistrito }, h("i", {}, S.dist.turno), S.dist.nombre, h("span", { class: "adm" }, "ADMIN ▾"))
+      : h("div", { class: "marca" }, h("i", {}, S.dist.turno), S.dist.nombre),
     h("nav", { class: "tabs" }, b("res", "Resumen"), b("cal", "Calendario"), b("form", "Formación"), b("inf", "Informes"), b("hist", "Cambios"), b("cuenta", "Cuenta")),
     h("span", { class: "yo" }, S.me.nombre));
 }
 function pintar() {
   const w = $app.querySelector(".wrap");
   const pos = w ? [w.scrollLeft, w.scrollTop] : null;
-  const cuerpo = S.vista === "res" ? vistaResumen() : S.vista === "cal" ? vistaCalendario() : S.vista === "hist" ? vistaHistorial() : S.vista === "form" ? vistaFormacion() : S.vista === "inf" ? vistaInformes() : vistaCuenta();
+  const vacio = !S.emps.length && (S.vista === "res" || S.vista === "cal" || S.vista === "inf");
+  const cuerpo = vacio ? distritoVacio() : S.vista === "res" ? vistaResumen() : S.vista === "cal" ? vistaCalendario() : S.vista === "hist" ? vistaHistorial() : S.vista === "form" ? vistaFormacion() : S.vista === "inf" ? vistaInformes() : vistaCuenta();
   $app.replaceChildren(cabecera(), cuerpo);
   if (S.vista !== "cal") return;
   const nw = $app.querySelector(".wrap");
@@ -290,26 +326,22 @@ function resumenDia() {
 }
 
 // ---------- resumen diario: turno actual (o el que acaba de pasar) y siguiente ----------
-// El ciclo son bloques de 12 días desde el 1/1/2026: 6 de servicio (M M T T N N) y 6 de descanso.
-const BASE = new Date(2026, 0, 1);
+// El ciclo son bloques de 12 días: 6 de servicio (M M T T N N) y 6 de descanso. Cada turno (A–F) los empieza en un día distinto.
 function bloqueFechas(k) {
-  return Array.from({ length: 6 }, (_, i) => { const x = new Date(2026, 0, 1 + 12 * k + i); return fechaStr(x.getFullYear(), x.getMonth(), x.getDate()); });
+  const off = desfase(S.dist && S.dist.letra);
+  return Array.from({ length: 6 }, (_, i) => { const x = new Date(2026, 0, 1 + 12 * k + off + i); return fechaStr(x.getFullYear(), x.getMonth(), x.getDate()); });
 }
 function bloqueActual() {
-  const t = new Date(), dd = Math.round((new Date(t.getFullYear(), t.getMonth(), t.getDate()) - BASE) / 864e5);
-  return Math.max(0, Math.floor(dd / 12));
+  return Math.floor((diasDesde2026(hoyStr()) - desfase(S.dist && S.dist.letra)) / 12);
 }
 async function cargarResumen() {
   const k = bloqueActual(), mas = (f, n) => { const [y, m, d] = f.split("-").map(Number), t = new Date(y, m - 1, d + n); return fechaStr(t.getFullYear(), t.getMonth(), t.getDate()); };
   // se carga algo más de margen para saber cuántos días seguidos lleva cada ausencia
   const a = mas(bloqueFechas(k)[0], -30), b = mas(bloqueFechas(k + 1)[5], 30);
   await cargarAnio(new Date().getFullYear());
-  const [d, x] = await Promise.all([
-    sb.from("dias").select("fecha,turno").gte("fecha", a).lte("fecha", b),
-    sb.from("asignaciones").select("empleado_id,fecha,codigo").gte("fecha", a).lte("fecha", b),
-  ]);
-  if (d.error || x.error) { toast("Error al cargar el resumen"); return; }
-  R.dias = Object.fromEntries(d.data.map(r => [r.fecha, r.turno]));
+  const x = await sb.from("asignaciones").select("empleado_id,fecha,codigo").gte("fecha", a).lte("fecha", b);
+  if (x.error) { toast("Error al cargar el resumen"); return; }
+  R.dias = diasRango(a, b);
   R.asig = Object.fromEntries(x.data.map(r => [r.empleado_id + "|" + r.fecha, r.codigo]));
   cargarNotas(bloqueFechas(k)[0], bloqueFechas(k + 1)[5]).then(() => { if (S.vista === "res") pintar(); });
   // mantiene S.asig de hoy y mañana coherente para el pico recomendado
@@ -449,7 +481,7 @@ const COLGRP = { a: ["#CFE3FB", "#0C3B7A"], t: ["#2563B8", "#FFFFFF"], m: ["#111
 function datosMes() {
   const nd = new Date(S.y, S.m + 1, 0).getDate(), dias = Array.from({ length: nd }, (_, i) => i + 1);
   const serv = f => ["M", "T", "N"].includes(S.dias[f]);
-  return { dias, titulo: `Usera-Villaverde D2 · ${MESES[S.m]} ${S.y}`, serv,
+  return { dias, titulo: `${S.dist.nombre} ${S.dist.turno} · ${MESES[S.m]} ${S.y}`, serv,
     tercio: dias.map(d => { const f = fechaStr(S.y, S.m, d); return serv(f) ? enTercio(f) : null; }),
     trabajan: dias.map(d => { const f = fechaStr(S.y, S.m, d); return serv(f) ? S.emps.filter(e => trabaja(e.id, f)).length : null; }) };
 }
@@ -630,8 +662,10 @@ async function guardar(emp, f, codigo) {
 
 function vistaHistorial() {
   const ul = h("ul", { class: "hist" }, h("li", {}, "Cargando…"));
-  sb.from("cambios").select("*").order("creado_en", { ascending: false }).limit(60).then(({ data, error }) => {
+  sb.from("cambios").select("*").order("creado_en", { ascending: false }).limit(modoAdmin() ? 400 : 60).then(({ data, error }) => {
     if (error) { ul.replaceChildren(h("li", {}, "No se pudo cargar el historial")); return; }
+    const ids = new Set(S.emps.map(e => e.id));
+    data = data.filter(c => ids.has(c.empleado_id)).slice(0, 60);
     ul.replaceChildren(...(data.length ? data.map(c => {
       const cuando = new Date(c.creado_en).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
       const txt = `${nombreEmp(c.empleado_id)} · ${fechaCorta(c.fecha)}: ${c.codigo_antes || "—"} → ${c.codigo_despues || "—"}`;
@@ -710,7 +744,7 @@ function vistaFormacion() {
   const pintarLista = () => {
     const q = (buscar.value || "").trim().toLowerCase();
     S.fq = buscar.value;
-    const orden = [S.me, ...S.emps.filter(e => e.id !== S.me.id)];
+    const orden = S.emps.some(e => e.id === S.me.id) ? [S.me, ...S.emps.filter(e => e.id !== S.me.id)] : S.emps;
     const bloques = orden.map(e => {
       const todas = (S.forms || []).filter(f => f.empleado_id === e.id).sort(cmpRegistros);
       const coincideNombre = q && e.nombre.toLowerCase().includes(q);
@@ -729,7 +763,7 @@ function vistaFormacion() {
     }).filter(Boolean);
     lista.replaceChildren(...(bloques.length ? bloques : [h("div", { class: "vacio" }, "Nada coincide con la búsqueda.")]));
   };
-  if (!S.abiertas) S.abiertas = new Set([S.me.id]);
+  if (!S.abiertas) S.abiertas = new Set(S.emps.some(e => e.id === S.me.id) ? [S.me.id] : []);
   buscar.addEventListener("input", pintarLista);
   const todo = h("button", { class: "btn sec mini", onclick: () => { if (S.abiertas.size >= S.emps.length) S.abiertas = new Set(); else S.abiertas = new Set(S.emps.map(e => e.id)); pintarLista(); todo.textContent = S.abiertas.size >= S.emps.length ? "Plegar todo" : "Desplegar todo"; } }, "Desplegar todo");
   cont.append(h("h2", {}, "Formaciones y habilitaciones"), h("p", { class: "sub" }, esResp() ? "Cada uno puede editar las suyas; como responsable puedes editar las de todos." : "Puedes añadir, corregir o borrar las tuyas. Las de los compañeros son solo de lectura."), h("div", { class: "fbarra" }, buscar, todo), lista);
@@ -831,6 +865,67 @@ function vistaInformes() {
   return cont;
 }
 
+// ---------- modo administrador: elegir y crear turnos/distritos ----------
+function distritoVacio() {
+  return h("div", { class: "pag" }, h("h2", {}, `${S.dist.nombre} · ${S.dist.turno}`),
+    h("p", {}, "Este distrito todavía no tiene personas dadas de alta."),
+    h("p", { class: "sub" }, `Turno ${S.dist.letra}, zona ${S.dist.zona}. Su calendario ya sigue el ciclo del turno ${S.dist.letra}.`),
+    h("button", { class: "btn", onclick: abrirSelectorDistrito }, "Cambiar de distrito"));
+}
+function abrirSelectorDistrito() {
+  let letra = S.dist.letra, zona = S.dist.zona;
+  const dlg = h("dialog", { class: "seldist" });
+  const cont = h("div", {});
+  const personas = id => (S.todos || []).filter(e => e.distrito_id === id).length;
+  const dibujar = () => {
+    const lista = (S.distritos || []).filter(d => d.letra === letra && d.zona === zona);
+    const nombre = h("input", { type: "text", placeholder: "Nombre del distrito nuevo", maxlength: "60" });
+    const minimo = h("input", { type: "number", min: "1", max: "50", value: "6" });
+    const tercio = h("input", { type: "number", min: "1", max: "50", value: "4" });
+    const err = h("div", { class: "error" });
+    const crear = async ev => {
+      const n = nombre.value.trim();
+      if (!n) { err.textContent = "Escribe el nombre del distrito."; return; }
+      ev.currentTarget.disabled = true; err.textContent = "Creando…";
+      const { data, error } = await sb.from("distritos")
+        .insert({ nombre: n, letra, zona, minimo_operativo: +minimo.value || 6, tercio: +tercio.value || 4 }).select().single();
+      if (error) { ev.currentTarget.disabled = false; err.textContent = /duplicate|unique/i.test(error.message) ? "Ya existe un distrito con ese nombre en este turno y zona." : "No se pudo crear: " + error.message; return; }
+      await cargarDistritos(); dlg.close(); toast(`Distrito «${data.nombre}» creado en ${letra}${zona}`, 3000);
+      cambiarDistrito(data);
+    };
+    cont.replaceChildren(
+      h("h4", {}, "1. Turno"),
+      h("div", { class: "opciones" }, [...LETRAS].map(l => h("button", { class: "btn sec" + (l === letra ? " act" : ""), onclick: () => { letra = l; dibujar(); } }, l))),
+      h("h4", {}, "2. Zona"),
+      h("div", { class: "opciones" }, [1, 2].map(z => h("button", { class: "btn sec" + (z === zona ? " act" : ""), onclick: () => { zona = z; dibujar(); } }, "Zona " + z))),
+      h("h4", {}, `3. Distrito del ${letra}${zona}`),
+      lista.length ? h("div", { class: "distlista" }, lista.map(d => h("button", { class: "btn sec full" + (d.id === S.dist.id ? " act" : ""), onclick: () => { dlg.close(); cambiarDistrito(d); } },
+        d.nombre, h("small", {}, ` · ${personas(d.id)} persona${personas(d.id) === 1 ? "" : "s"}`))))
+        : h("p", { class: "sub" }, "Todavía no hay ningún distrito en este turno y zona."),
+      h("details", { class: "nuevodist" }, h("summary", {}, `+ Crear un distrito en ${letra}${zona}`),
+        h("label", {}, "Nombre", nombre),
+        h("div", { class: "dosnum" }, h("label", {}, "Mínimo de personas trabajando", minimo), h("label", {}, "Máximo de ausentes (tercio)", tercio)),
+        h("button", { class: "btn full", onclick: crear }, "Crear distrito"), err));
+  };
+  dibujar();
+  dlg.append(h("h3", {}, "Ver otro turno o distrito"), cont,
+    h("div", { class: "fila" }, h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cerrar"),
+      S.dist.id !== S.me.distrito_id ? h("button", { class: "btn sec", onclick: () => { dlg.close(); cambiarDistrito(miDistrito()); } }, "Volver al mío") : null));
+  dlg.addEventListener("close", () => dlg.remove());
+  document.body.append(dlg); dlg.showModal();
+}
+function bloqueAdmin() {
+  const on = modoAdmin();
+  return [h("h3", {}, "Modo administrador"),
+    h("p", { class: "sub" }, on
+      ? `Activado. Estás viendo ${S.dist.nombre} (${S.dist.turno}). Pulsa el nombre del distrito, arriba, para cambiar de turno o distrito, o para crear uno nuevo.`
+      : "Solo lo tienes tú. Te deja ver cualquier turno y distrito y crear distritos nuevos. Apagado, ves tu distrito como siempre."),
+    h("div", { class: "opciones" },
+      h("button", { class: "btn sec" + (on ? "" : " act"), onclick: async () => { if (!on) return; ponerLS(ADMIN_KEY, null); ponerLS(DIST_KEY, null); await cambiarDistrito(miDistrito()); } }, "Apagado"),
+      h("button", { class: "btn sec" + (on ? " act" : ""), onclick: async () => { if (on) return; ponerLS(ADMIN_KEY, "1"); await cargarDistritos(); pintar(); } }, "Encendido")),
+    on ? h("button", { class: "btn full", onclick: abrirSelectorDistrito }, "Cambiar de turno o distrito") : null];
+}
+
 // ---------- copia de seguridad (solo administrador) ----------
 async function leerTodo(tabla, orden) {
   const out = [];
@@ -920,6 +1015,7 @@ function vistaCuenta() {
       msg.textContent = error ? "No se pudo cambiar: " + error.message : "Contraseña cambiada ✔";
       if (!error) { p1.value = p2.value = ""; sb.rpc("marcar_clave_cambiada"); }
     } }, "Guardar contraseña"), msg,
+    S.me.admin ? bloqueAdmin() : null,
     S.me.admin ? [h("h3", {}, "Copia de seguridad"), h("p", { class: "sub" }, "Descarga todo (calendario, asignaciones, formaciones y cambios) en un archivo que abre Excel. Guárdalo de vez en cuando."),
       h("button", { class: "btn sec full", onclick: ev => descargarCopia(ev.currentTarget, msgCopia) }, "Descargar copia"), msgCopia] : null,
     h("hr"), h("button", { class: "btn sec full", onclick: salir }, "Cerrar sesión"));
