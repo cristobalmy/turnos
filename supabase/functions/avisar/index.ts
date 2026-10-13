@@ -63,13 +63,13 @@ function rachaAusencia(cods, asig, dias, empId, f) {
   }
   return n;
 }
-// Orden de "quién debe quitarse": 1) permisos, luego JS y por último vacaciones, 2) racha más corta, 3) más días ya disfrutados este año.
+// Orden de "quién debe quitarse": 1) permisos, luego JS y por último vacaciones; 2) dentro de cada grupo, quien más días ha disfrutado este año; 3) orden de la lista.
 function recomendarQuitar(emps, cods, asig, dias, totales, f) {
   const lista = emps.filter((e) => esAus(cods, asig[e.id + "|" + f])).map((e) => {
     const c = asig[e.id + "|" + f];
     return { e, c, vac: nivelQuitar(c), racha: rachaAusencia(cods, asig, dias, e.id, f), tot: totales[e.id] || 0 };
   });
-  lista.sort((a, b) => a.vac - b.vac || a.racha - b.racha || b.tot - a.tot || a.e.orden - b.e.orden);
+  lista.sort((a, b) => a.vac - b.vac || b.tot - a.tot || a.e.orden - b.e.orden);
   return lista;
 }
 // Línea que se añade al aviso si el día f queda por encima del tercio (o null si no).

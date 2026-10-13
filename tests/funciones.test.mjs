@@ -17,11 +17,12 @@ const asig = { "1|2026-10-20": "AP", "2|2026-10-20": "V1", "3|2026-10-20": "CJ",
 for (let d = 16; d <= 21; d++) asig["2|2026-10-" + d] = "V1";
 const totales = { 1: 3, 4: 0 };
 const r = recomendarQuitar(emps, cods, asig, dias, totales, "2026-10-20");
-eq(r.map(x => x.e.nombre), ["Cristobal", "Gustavo", "Nacho", "Alfonso", "Cristina"], "orden: permisos primero (más días cogidos, luego racha), vacaciones al final y entre ellas la racha más corta antes");
-eq(r[2].racha, 2, "racha del permiso de 2 días");
+eq(r.map(x => x.e.nombre), ["Cristobal", "Nacho", "Gustavo", "Cristina", "Alfonso"], "orden: permisos primero y vacaciones al final; dentro de cada grupo, quien más días ha disfrutado (a igualdad, orden de la lista)");
+eq(recomendarQuitar(emps, cods, asig, dias, { 5: 10, 2: 3 }, "2026-10-20").slice(3).map(x => x.e.nombre), ["Alfonso", "Cristina"], "los días seguidos ya no cuentan: entre vacaciones se quita quien más días ha disfrutado");
+eq(r.find(x => x.e.nombre === "Nacho").racha, 2, "racha del permiso de 2 días");
 eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 4, false), "⚠️ Tercio superado el 20/10: 5 de 4", "aviso al equipo: día y cuántos");
 eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 4, true), "⚠️ Tercio superado el 20/10: 5 de 4. Debe quitarse: Cristobal (AP)", "aviso a responsables: además quién debe quitarse");
-eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 3, true), "⚠️ Tercio superado el 20/10: 5 de 3. Deben quitarse 2: Cristobal (AP), Gustavo (AP)", "si sobran 2, nombra a 2");
+eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 3, true), "⚠️ Tercio superado el 20/10: 5 de 3. Deben quitarse 2: Cristobal (AP), Nacho (CJ)", "si sobran 2, nombra a 2");
 eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 5, true), null, "con tercio 5 y 5 personas no se supera");
 eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-21", 4, true), null, "un día con pocas ausencias no avisa");
 const codsJS = { ...cods, JS: { tipo: "Ausencia Justificada" } };

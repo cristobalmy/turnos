@@ -392,13 +392,13 @@ function rachaAusencia(empId, f, A = R.asig, D = R.dias) {
   }
   return n;
 }
-// Recomendación (orden de "quién debe quitarse"): 1) permisos, luego JS y por último vacaciones, 2) racha más corta, 3) más días cogidos en el año.
+// Recomendación (orden de "quién debe quitarse"): 1) permisos, luego JS y por último vacaciones; 2) dentro de cada grupo, quien más días ha disfrutado este año; 3) orden de la lista.
 function recomendarQuitar(f, A = R.asig, D = R.dias) {
   const lista = S.emps.filter(e => esAus(A[e.id + "|" + f])).map(e => {
     const c = A[e.id + "|" + f];
     return { e, c, vac: nivelQuitar(c), racha: rachaAusencia(e.id, f, A, D), tot: diasCogidos(e.id) };
   });
-  lista.sort((a, b) => a.vac - b.vac || a.racha - b.racha || b.tot - a.tot || a.e.orden - b.e.orden);
+  lista.sort((a, b) => a.vac - b.vac || b.tot - a.tot || a.e.orden - b.e.orden);
   return lista;
 }
 const trabajaR = (id, f) => { const c = R.asig[id + "|" + f]; return !c || !!(S.cods[c] && S.cods[c].cuenta_como_trabajo); };
@@ -436,7 +436,7 @@ function panelBloque(titulo, k, clase) {
         const sobran = tercioR(f) - S.tercio, fuera = r.slice(0, sobran), luego = r.slice(sobran, sobran + 2), pl = n => n === 1 ? "" : "s";
         return h("td", {}, h("small", {}, sobran > 1 ? `deben quitarse ${sobran}` : "recomendado"),
           fuera.map(x => [h("div", {}, h("b", {}, x.e.nombre)),
-            h("small", {}, `${x.c} · ${x.racha} día${pl(x.racha)} seguido${pl(x.racha)} · ${x.tot} este año`)]),
+            h("small", {}, `${x.c} · ${x.tot} día${pl(x.tot)} disfrutado${pl(x.tot)} este año`)]),
           luego.length ? h("small", {}, "luego " + luego.map(y => y.e.nombre).join(", ")) : null);
       }) : null));
   return h("section", { class: "bloque " + clase },
@@ -616,12 +616,12 @@ function bloqueQuitar() {
       h("span", { class: "pv" },
         h("span", { class: "exceso" }, `${n} de ${S.tercio}`), " ",
         fuera.length ? [sobran > 1 ? `Deben quitarse ${sobran}: ` : "Debe quitarse: ",
-          fuera.map((x, i) => [i ? ", " : "", h("b", {}, x.e.nombre), h("small", {}, ` (${x.c} · ${x.racha} día${pl(x.racha)} seguido${pl(x.racha)} · ${x.tot} este año)`)])] : "sin candidatos",
+          fuera.map((x, i) => [i ? ", " : "", h("b", {}, x.e.nombre), h("small", {}, ` (${x.c} · ${x.tot} día${pl(x.tot)} disfrutado${pl(x.tot)} este año)`)])] : "sin candidatos",
         luego.length ? h("small", {}, " · luego " + luego.map(x => x.e.nombre).join(", ")) : null)));
   }
   return h("div", { class: "picoreco quitareco" }, h("div", { class: "pt" }, "Tercio superado: quién debe quitarse"),
     lineas.length ? lineas : h("div", { class: "pl" }, h("span", { class: "pv" }, S.y === +hoy.slice(0, 4) && S.m === +hoy.slice(5, 7) - 1 ? "Ningún día que queda de este mes supera el tercio." : "Ningún día de este mes supera el tercio.")),
-    h("small", { class: "det" }, "Solo días de hoy en adelante. Se quitan primero los permisos (AP, CJ, CH…), después los JS y por último las vacaciones; entre ellos, quien lleva menos días seguidos y, después, quien más días ha cogido este año. Toca un día para ver su resumen."));
+    h("small", { class: "det" }, "Solo días de hoy en adelante. Se quitan primero los permisos (AP, CJ, CH…), después los JS y por último las vacaciones; dentro de cada grupo, quien más días de vacaciones y permisos ha disfrutado este año. Toca un día para ver su resumen."));
 }
 
 const GRUPOS = [["a", "Vacaciones y permisos"], ["t", "Trabajo"], ["m", "Modificadores"], ["e", "Otros"]];
