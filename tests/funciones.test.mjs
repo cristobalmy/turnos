@@ -24,7 +24,10 @@ eq(recomendarQuitar(emps, codsV, asigV, dias, { 4: { p: 0, v: 12 }, 3: { p: 30, 
   ["Cristina V3", "Gustavo V2", "Nacho V2", "Alfonso V1", "Cristobal V1"], "vacaciones: V3, luego V2 y luego V1; dentro de cada una, quien más días de vacaciones (los permisos no cuentan)");
 const asigP = { "1|2026-10-20": "AP", "2|2026-10-20": "CH", "3|2026-10-20": "CJ" };
 eq(recomendarQuitar(emps, codsV, asigP, dias, { 1: { p: 2, v: 40 }, 2: { p: 1, v: 0 }, 3: { p: 5, v: 0 } }, "2026-10-20").map(x => x.e.nombre),
-  ["Nacho", "Cristobal", "Cristina"], "permisos: AP, CJ, CH y JS se cuentan juntos; las vacaciones no suman");
+  ["Nacho", "Cristobal", "Cristina"], "AP, CJ y CH: se quita antes quien más días de AP + CJ + CH lleva; las vacaciones no suman");
+const asigJ = { "1|2026-10-20": "JS", "2|2026-10-20": "AP", "3|2026-10-20": "CH" };
+eq(recomendarQuitar(emps, codsV, asigJ, dias, { 1: { p: 0 }, 2: { p: 1 }, 3: { p: 9 } }, "2026-10-20").map(x => x.e.nombre + " " + x.c),
+  ["Nacho CH", "Cristina AP", "Cristobal JS"], "el JS va por delante de AP, CJ y CH: se quitan antes ellos");
 eq(r.find(x => x.e.nombre === "Nacho").racha, 2, "racha del permiso de 2 días");
 eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 4, false), "⚠️ Tercio superado el 20/10: 5 de 4", "aviso al equipo: día y cuántos");
 eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 4, true), "⚠️ Tercio superado el 20/10: 5 de 4. Debe quitarse: Cristobal (AP)", "aviso a responsables: además quién debe quitarse");

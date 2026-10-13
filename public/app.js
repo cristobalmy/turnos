@@ -373,11 +373,12 @@ const esVac = c => ["V1", "V2", "V3"].includes(c);
 // Al superar el tercio se quitan, por este orden: los permisos (AP, CJ, CH, SS, NAV…), los JS (juicio saliente),
 // y por último las vacaciones, que entre ellas tienen prioridad V1 sobre V2 y V2 sobre V3 (se quita antes V3).
 const nivelQuitar = c => ({ V3: 2, V2: 3, V1: 4 })[c] ?? (c === "JS" ? 1 : 0);
-// Días ya disfrutados (anteriores a hoy) en el año actual, contados aparte: vacaciones por un lado
-// y permisos (AP, CJ, CH, JS…) por otro, según el código del día que se mira.
+// Días ya disfrutados (anteriores a hoy) en el año actual, contados aparte: para las vacaciones, los días de vacaciones;
+// para el resto, el cómputo total de AP + CJ + CH (quien más ha librado por estos días se quita antes).
+const CUENTA_PERM = ["AP", "CJ", "CH"];
 function diasCogidos(empId, c) {
-  const hoy = hoyStr(), y = +hoy.slice(0, 4), vac = esVac(c);
-  return (S.infAnio[y] || []).filter(r => r.empleado_id === empId && r.fecha < hoy && esAus(r.codigo) && esVac(r.codigo) === vac).length;
+  const hoy = hoyStr(), y = +hoy.slice(0, 4), cuenta = esVac(c) ? esVac : (x => CUENTA_PERM.includes(x));
+  return (S.infAnio[y] || []).filter(r => r.empleado_id === empId && r.fecha < hoy && cuenta(r.codigo)).length;
 }
 // Días de servicio seguidos de ausencia que incluyen el día f (los días libres del ciclo no cortan la racha).
 function rachaAusencia(empId, f, A = R.asig, D = R.dias) {
@@ -438,7 +439,7 @@ function panelBloque(titulo, k, clase) {
         const sobran = tercioR(f) - S.tercio, fuera = r.slice(0, sobran), luego = r.slice(sobran), pl = n => n === 1 ? "" : "s";
         return h("td", {}, h("small", {}, sobran > 1 ? `deben quitarse ${sobran}` : "recomendado"),
           fuera.map((x, i) => [h("div", {}, h("b", {}, `${i + 1}º ${x.e.nombre}`)),
-            h("small", {}, `${x.c} · ${x.tot} día${pl(x.tot)} de ${esVac(x.c) ? "vacaciones" : "permisos"} este año`)]),
+            h("small", {}, `${x.c} · ${x.tot} día${pl(x.tot)} de ${esVac(x.c) ? "vacaciones" : "AP/CJ/CH"} este año`)]),
           luego.length ? h("small", {}, "luego " + luego.map((y, i) => `${sobran + i + 1}º ${y.e.nombre}`).join(", ")) : null);
       }) : null));
   return h("section", { class: "bloque " + clase },
@@ -618,12 +619,12 @@ function bloqueQuitar() {
       h("span", { class: "pv" },
         h("span", { class: "exceso" }, `${n} de ${S.tercio}`), " ",
         fuera.length ? [sobran > 1 ? `Deben quitarse ${sobran}: ` : "Debe quitarse: ",
-          fuera.map((x, i) => [i ? ", " : "", h("b", {}, `${i + 1}º ${x.e.nombre}`), h("small", {}, ` (${x.c} · ${x.tot} día${pl(x.tot)} de ${esVac(x.c) ? "vacaciones" : "permisos"} este año)`)])] : "sin candidatos",
+          fuera.map((x, i) => [i ? ", " : "", h("b", {}, `${i + 1}º ${x.e.nombre}`), h("small", {}, ` (${x.c} · ${x.tot} día${pl(x.tot)} de ${esVac(x.c) ? "vacaciones" : "AP/CJ/CH"} este año)`)])] : "sin candidatos",
         luego.length ? h("small", {}, " · luego " + luego.map((x, i) => `${sobran + i + 1}º ${x.e.nombre} (${x.c} · ${x.tot})`).join(", ")) : null)));
   }
   return h("div", { class: "picoreco quitareco" }, h("div", { class: "pt" }, "Tercio superado: quién debe quitarse"),
     lineas.length ? lineas : h("div", { class: "pl" }, h("span", { class: "pv" }, S.y === +hoy.slice(0, 4) && S.m === +hoy.slice(5, 7) - 1 ? "Ningún día que queda de este mes supera el tercio." : "Ningún día de este mes supera el tercio.")),
-    h("small", { class: "det" }, "Solo días de hoy en adelante. Orden para quitarse: permisos (AP, CJ, CH), JS, V3, V2 y por último V1. Dentro de cada uno, primero quien más días lleva este año: los AP, CJ, CH y JS se suman juntos; las vacaciones se cuentan aparte. El número entre paréntesis son esos días. Toca un día para ver su resumen."));
+    h("small", { class: "det" }, "Solo días de hoy en adelante. Orden para quitarse: AP, CJ y CH; después JS; después V3, V2 y por último V1. Dentro de cada uno, primero quien más días lleva este año: AP + CJ + CH se suman en un solo cómputo; las vacaciones se cuentan aparte. El número entre paréntesis son esos días. Toca un día para ver su resumen."));
 }
 
 const GRUPOS = [["a", "Vacaciones y permisos"], ["t", "Trabajo"], ["m", "Modificadores"], ["e", "Otros"]];

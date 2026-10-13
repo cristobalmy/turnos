@@ -48,7 +48,7 @@ function esAus(cods, c) { return !!(c && cods[c] && cods[c].tipo === "Ausencia J
 function esVac(c) { return c === "V1" || c === "V2" || c === "V3"; }
 // Orden para quitarse: permisos (AP, CJ, CH, SS, NAV…), JS (juicio saliente) y por último vacaciones: V3, V2 y V1.
 function nivelQuitar(c) { return c === "V3" ? 2 : c === "V2" ? 3 : c === "V1" ? 4 : c === "JS" ? 1 : 0; }
-// totales[id] = { p: días de permisos disfrutados este año, v: días de vacaciones }; se usa el que corresponde al código.
+// totales[id] = { p: días de AP + CJ + CH disfrutados este año (un solo cómputo), v: días de vacaciones }; se usa el que corresponde al código.
 function diasDe(totales, id, c) { const t = totales[id] || {}; return (esVac(c) ? t.v : t.p) || 0; }
 // asig: "idEmpleado|fecha" -> código; dias: fecha -> turno (M T N S L)
 function contarTercio(emps, cods, asig, f) { return emps.filter((e) => esAus(cods, asig[e.id + "|" + f])).length; }
@@ -191,7 +191,7 @@ async function tercioDelCambio(sb, cambios, emps, dist) {
   const año = hoy.slice(0, 4);
   const pasadas = await leerTodo(() => sb.from("asignaciones").select("empleado_id,fecha,codigo").in("empleado_id", misIds).gte("fecha", año + "-01-01").lt("fecha", hoy).order("fecha").order("empleado_id"));
   const totales = {};
-  for (const r of pasadas) if (esAus(cods, r.codigo)) { const t = (totales[r.empleado_id] = totales[r.empleado_id] || { p: 0, v: 0 }); if (esVac(r.codigo)) t.v++; else t.p++; }
+  for (const r of pasadas) if (esAus(cods, r.codigo)) { const t = (totales[r.empleado_id] = totales[r.empleado_id] || { p: 0, v: 0 }); if (esVac(r.codigo)) t.v++; else if (["AP", "CJ", "CH"].includes(r.codigo)) t.p++; }
   for (const f of fechas.slice(0, 4)) {
     if (!["M", "T", "N"].includes(dias[f])) continue;   // el tercio solo cuenta en días de servicio
     const a = lineaTercio(emps, cods, asig, dias, totales, f, tercio, false);
