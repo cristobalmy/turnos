@@ -370,12 +370,11 @@ async function cargarAnio(y) {
 }
 const esAus = c => !!(c && S.cods[c] && S.cods[c].tipo === "Ausencia Justificada");
 const esVac = c => ["V1", "V2", "V3"].includes(c);
-// Al superar el tercio se quitan, por este orden: los permisos (AP, CJ, CH, SS, NAV…), los JS (juicio saliente),
+// Al superar el tercio se quitan primero los permisos (AP, CJ, CH, JS, SS, NAV…), todos al mismo nivel,
 // y por último las vacaciones, que entre ellas tienen prioridad V1 sobre V2 y V2 sobre V3 (se quita antes V3).
-const nivelQuitar = c => ({ V3: 2, V2: 3, V1: 4 })[c] ?? (c === "JS" ? 1 : 0);
+const nivelQuitar = c => ({ V3: 2, V2: 3, V1: 4 })[c] ?? 0;
 // Días ya disfrutados (anteriores a hoy) en el año actual, contados aparte: para las vacaciones, los días de vacaciones;
 // para el resto, el cómputo total de AP + CJ + CH + JS (quien más ha librado por estos días se quita antes).
-// El JS suma en el cómputo, pero al quitarse sigue teniendo preferencia sobre AP, CJ y CH.
 const CUENTA_PERM = ["AP", "CJ", "CH", "JS"];
 function diasCogidos(empId, c) {
   const hoy = hoyStr(), y = +hoy.slice(0, 4), cuenta = esVac(c) ? esVac : (x => CUENTA_PERM.includes(x));
@@ -395,7 +394,7 @@ function rachaAusencia(empId, f, A = R.asig, D = R.dias) {
   }
   return n;
 }
-// Recomendación (orden de "quién debe quitarse"): 1) permisos, JS, V3, V2 y V1; 2) dentro de cada uno, quien más días ha disfrutado
+// Recomendación (orden de "quién debe quitarse"): 1) permisos (AP, CJ, CH, JS…), V3, V2 y V1; 2) dentro de cada uno, quien más días ha disfrutado
 // este año (vacaciones o permisos, contados aparte); 3) orden de la lista.
 function recomendarQuitar(f, A = R.asig, D = R.dias) {
   const lista = S.emps.filter(e => esAus(A[e.id + "|" + f])).map(e => {
@@ -625,7 +624,7 @@ function bloqueQuitar() {
   }
   return h("div", { class: "picoreco quitareco" }, h("div", { class: "pt" }, "Tercio superado: quién debe quitarse"),
     lineas.length ? lineas : h("div", { class: "pl" }, h("span", { class: "pv" }, S.y === +hoy.slice(0, 4) && S.m === +hoy.slice(5, 7) - 1 ? "Ningún día que queda de este mes supera el tercio." : "Ningún día de este mes supera el tercio.")),
-    h("small", { class: "det" }, "Solo días de hoy en adelante. Orden para quitarse: AP, CJ y CH; después JS; después V3, V2 y por último V1. Dentro de cada uno, primero quien más días lleva este año: AP + CJ + CH + JS se suman en un solo cómputo; las vacaciones se cuentan aparte. El número entre paréntesis son esos días. Toca un día para ver su resumen."));
+    h("small", { class: "det" }, "Solo días de hoy en adelante. Orden para quitarse: AP, CJ, CH y JS (todos igual); después V3, V2 y por último V1. Dentro de cada uno, primero quien más días lleva este año: AP + CJ + CH + JS se suman en un solo cómputo; las vacaciones se cuentan aparte. El número entre paréntesis son esos días. Toca un día para ver su resumen."));
 }
 
 const GRUPOS = [["a", "Vacaciones y permisos"], ["t", "Trabajo"], ["m", "Modificadores"], ["e", "Otros"]];

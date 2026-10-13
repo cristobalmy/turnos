@@ -26,8 +26,8 @@ const asigP = { "1|2026-10-20": "AP", "2|2026-10-20": "CH", "3|2026-10-20": "CJ"
 eq(recomendarQuitar(emps, codsV, asigP, dias, { 1: { p: 2, v: 40 }, 2: { p: 1, v: 0 }, 3: { p: 5, v: 0 } }, "2026-10-20").map(x => x.e.nombre),
   ["Nacho", "Cristobal", "Cristina"], "AP, CJ y CH: se quita antes quien más días de AP + CJ + CH + JS lleva; las vacaciones no suman");
 const asigJ = { "1|2026-10-20": "JS", "2|2026-10-20": "AP", "3|2026-10-20": "CH" };
-eq(recomendarQuitar(emps, codsV, asigJ, dias, { 1: { p: 0 }, 2: { p: 1 }, 3: { p: 9 } }, "2026-10-20").map(x => x.e.nombre + " " + x.c),
-  ["Nacho CH", "Cristina AP", "Cristobal JS"], "el JS va por delante de AP, CJ y CH aunque sume menos: se quitan antes ellos");
+eq(recomendarQuitar(emps, codsV, asigJ, dias, { 1: { p: 31 }, 2: { p: 4 }, 3: { p: 21 } }, "2026-10-20").map(x => x.e.nombre + " " + x.c),
+  ["Cristobal JS", "Nacho CH", "Cristina AP"], "el JS cuenta como uno más: solo manda quién tiene más días de AP+CJ+CH+JS (caso Sobrino 31, Rafa 21, Cristina 4)");
 eq(r.find(x => x.e.nombre === "Nacho").racha, 2, "racha del permiso de 2 días");
 eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 4, false), "⚠️ Tercio superado el 20/10: 5 de 4", "aviso al equipo: día y cuántos");
 eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 4, true), "⚠️ Tercio superado el 20/10: 5 de 4. Debe quitarse: Cristobal (AP)", "aviso a responsables: además quién debe quitarse");
@@ -36,7 +36,7 @@ eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 5, true), null, "c
 eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-21", 4, true), null, "un día con pocas ausencias no avisa");
 const codsJS = { ...cods, JS: { tipo: "Ausencia Justificada" } };
 const asigJS = { "1|2026-10-20": "JS", "2|2026-10-20": "V1", "3|2026-10-20": "CJ", "4|2026-10-20": "AP" };
-eq(recomendarQuitar(emps, codsJS, asigJS, dias, {}, "2026-10-20").map(x => x.c), ["CJ", "AP", "JS", "V1"], "JS: se quita después de AP/CJ/CH y antes que las vacaciones");
+eq(recomendarQuitar(emps, codsJS, asigJS, dias, {}, "2026-10-20").map(x => x.c), ["JS", "CJ", "AP", "V1"], "JS: va con AP/CJ/CH (a igualdad de días, orden de la lista) y antes que las vacaciones");
 // rachas que saltan los días libres del ciclo: S/L no cortan
 const dias2 = { "2026-10-19": "N", "2026-10-20": "S", "2026-10-21": "L", "2026-10-22": "M" };
 const asig2 = { "1|2026-10-19": "V1", "1|2026-10-22": "V1" };

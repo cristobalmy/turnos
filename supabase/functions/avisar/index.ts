@@ -46,8 +46,8 @@ function diasCiclo(desde, hasta, letra) { const o = {}; for (let f = desde; f <=
 function masDias(f, n) { const p = f.split("-").map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)).toISOString().slice(0, 10); }
 function esAus(cods, c) { return !!(c && cods[c] && cods[c].tipo === "Ausencia Justificada"); }
 function esVac(c) { return c === "V1" || c === "V2" || c === "V3"; }
-// Orden para quitarse: permisos (AP, CJ, CH, SS, NAV…), JS (juicio saliente) y por último vacaciones: V3, V2 y V1.
-function nivelQuitar(c) { return c === "V3" ? 2 : c === "V2" ? 3 : c === "V1" ? 4 : c === "JS" ? 1 : 0; }
+// Orden para quitarse: permisos (AP, CJ, CH, JS, SS, NAV…), todos al mismo nivel, y por último vacaciones: V3, V2 y V1.
+function nivelQuitar(c) { return c === "V3" ? 2 : c === "V2" ? 3 : c === "V1" ? 4 : 0; }
 // totales[id] = { p: días de AP + CJ + CH + JS disfrutados este año (un solo cómputo), v: días de vacaciones }; se usa el que corresponde al código.
 function diasDe(totales, id, c) { const t = totales[id] || {}; return (esVac(c) ? t.v : t.p) || 0; }
 // asig: "idEmpleado|fecha" -> código; dias: fecha -> turno (M T N S L)
@@ -65,7 +65,7 @@ function rachaAusencia(cods, asig, dias, empId, f) {
   }
   return n;
 }
-// Orden de "quién debe quitarse": 1) permisos, JS, V3, V2 y V1; 2) dentro de cada uno, quien más días ha disfrutado este año
+// Orden de "quién debe quitarse": 1) permisos (AP, CJ, CH, JS…), V3, V2 y V1; 2) dentro de cada uno, quien más días ha disfrutado este año
 // (vacaciones o permisos, contados aparte); 3) orden de la lista.
 function recomendarQuitar(emps, cods, asig, dias, totales, f) {
   const lista = emps.filter((e) => esAus(cods, asig[e.id + "|" + f])).map((e) => {
