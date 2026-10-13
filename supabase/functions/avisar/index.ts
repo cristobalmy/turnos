@@ -46,8 +46,10 @@ function diasCiclo(desde, hasta, letra) { const o = {}; for (let f = desde; f <=
 function masDias(f, n) { const p = f.split("-").map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)).toISOString().slice(0, 10); }
 function esAus(cods, c) { return !!(c && cods[c] && cods[c].tipo === "Ausencia Justificada"); }
 function esVac(c) { return c === "V1" || c === "V2" || c === "V3"; }
-// Se quitan primero los permisos (AP, CJ, CH, SS, NAV…), después los JS (juicio saliente) y por último las vacaciones.
-function nivelQuitar(c) { return esVac(c) ? 2 : c === "JS" ? 1 : 0; }
+// Orden para quitarse: permisos (AP, CJ, CH, SS, NAV…), JS (juicio saliente) y por último vacaciones: V3, V2 y V1.
+function nivelQuitar(c) { return c === "V3" ? 2 : c === "V2" ? 3 : c === "V1" ? 4 : c === "JS" ? 1 : 0; }
+// totales[id] = { p: días de permisos disfrutados este año, v: días de vacaciones }; se usa el que corresponde al código.
+function diasDe(totales, id, c) { const t = totales[id] || {}; return (esVac(c) ? t.v : t.p) || 0; }
 // asig: "idEmpleado|fecha" -> código; dias: fecha -> turno (M T N S L)
 function contarTercio(emps, cods, asig, f) { return emps.filter((e) => esAus(cods, asig[e.id + "|" + f])).length; }
 // Días de servicio seguidos de ausencia que incluyen el día f (los días libres del ciclo no cortan la racha).
@@ -63,11 +65,12 @@ function rachaAusencia(cods, asig, dias, empId, f) {
   }
   return n;
 }
-// Orden de "quién debe quitarse": 1) permisos, luego JS y por último vacaciones; 2) dentro de cada grupo, quien más días ha disfrutado este año; 3) orden de la lista.
+// Orden de "quién debe quitarse": 1) permisos, JS, V3, V2 y V1; 2) dentro de cada uno, quien más días ha disfrutado este año
+// (vacaciones o permisos, contados aparte); 3) orden de la lista.
 function recomendarQuitar(emps, cods, asig, dias, totales, f) {
   const lista = emps.filter((e) => esAus(cods, asig[e.id + "|" + f])).map((e) => {
     const c = asig[e.id + "|" + f];
-    return { e, c, vac: nivelQuitar(c), racha: rachaAusencia(cods, asig, dias, e.id, f), tot: totales[e.id] || 0 };
+    return { e, c, vac: nivelQuitar(c), racha: rachaAusencia(cods, asig, dias, e.id, f), tot: diasDe(totales, e.id, c) };
   });
   lista.sort((a, b) => a.vac - b.vac || b.tot - a.tot || a.e.orden - b.e.orden);
   return lista;
@@ -80,7 +83,7 @@ function lineaTercio(emps, cods, asig, dias, totales, f, tercio, conQuitar) {
   let t = "⚠️ Tercio superado el " + fechaCorta(f) + ": " + n + " de " + tercio;
   if (conQuitar) {
     const sobran = n - tercio, r = recomendarQuitar(emps, cods, asig, dias, totales, f).slice(0, sobran);
-    if (r.length) t += ". " + (sobran > 1 ? "Deben quitarse " + sobran + ": " : "Debe quitarse: ") + r.map((x) => x.e.nombre + " (" + x.c + ")").join(", ");
+    if (r.length) t += ". " + (sobran > 1 ? "Deben quitarse " + sobran + ": " : "Debe quitarse: ") + r.map((x, i) => (sobran > 1 ? i + 1 + "º " : "") + x.e.nombre + " (" + x.c + ")").join(", ");
   }
   return t;
 }
@@ -188,7 +191,7 @@ async function tercioDelCambio(sb, cambios, emps, dist) {
   const año = hoy.slice(0, 4);
   const pasadas = await leerTodo(() => sb.from("asignaciones").select("empleado_id,fecha,codigo").in("empleado_id", misIds).gte("fecha", año + "-01-01").lt("fecha", hoy).order("fecha").order("empleado_id"));
   const totales = {};
-  for (const r of pasadas) if (esAus(cods, r.codigo)) totales[r.empleado_id] = (totales[r.empleado_id] || 0) + 1;
+  for (const r of pasadas) if (esAus(cods, r.codigo)) { const t = (totales[r.empleado_id] = totales[r.empleado_id] || { p: 0, v: 0 }); if (esVac(r.codigo)) t.v++; else t.p++; }
   for (const f of fechas.slice(0, 4)) {
     if (!["M", "T", "N"].includes(dias[f])) continue;   // el tercio solo cuenta en días de servicio
     const a = lineaTercio(emps, cods, asig, dias, totales, f, tercio, false);

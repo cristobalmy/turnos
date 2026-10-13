@@ -15,14 +15,20 @@ const dias = {}; for (let d = 14; d <= 24; d++) dias["2026-10-" + d] = d <= 21 ?
 // 5 ausentes el 20/10: 1 AP (1 día), 2 V1 (14..21 seguidos), 3 CJ (20 y 21), 4 AP (20), 5 V2 (20)
 const asig = { "1|2026-10-20": "AP", "2|2026-10-20": "V1", "3|2026-10-20": "CJ", "3|2026-10-21": "CJ", "4|2026-10-20": "AP", "5|2026-10-20": "V2", "6|2026-10-20": "PICO" };
 for (let d = 16; d <= 21; d++) asig["2|2026-10-" + d] = "V1";
-const totales = { 1: 3, 4: 0 };
+const totales = { 1: { p: 3, v: 0 }, 4: { p: 0, v: 20 } };
 const r = recomendarQuitar(emps, cods, asig, dias, totales, "2026-10-20");
-eq(r.map(x => x.e.nombre), ["Cristobal", "Nacho", "Gustavo", "Cristina", "Alfonso"], "orden: permisos primero y vacaciones al final; dentro de cada grupo, quien más días ha disfrutado (a igualdad, orden de la lista)");
-eq(recomendarQuitar(emps, cods, asig, dias, { 5: 10, 2: 3 }, "2026-10-20").slice(3).map(x => x.e.nombre), ["Alfonso", "Cristina"], "los días seguidos ya no cuentan: entre vacaciones se quita quien más días ha disfrutado");
+eq(r.map(x => x.e.nombre), ["Cristobal", "Nacho", "Gustavo", "Alfonso", "Cristina"], "orden: permisos (por días de permisos; las vacaciones de Gustavo no cuentan), después V2 y por último V1");
+const codsV = { ...cods, V3: { tipo: "Ausencia Justificada" }, CH: { tipo: "Ausencia Justificada" }, JS: { tipo: "Ausencia Justificada" } };
+const asigV = { "1|2026-10-20": "V1", "2|2026-10-20": "V3", "3|2026-10-20": "V2", "4|2026-10-20": "V2", "5|2026-10-20": "V1" };
+eq(recomendarQuitar(emps, codsV, asigV, dias, { 4: { p: 0, v: 12 }, 3: { p: 30, v: 2 }, 5: { p: 0, v: 6 } }, "2026-10-20").map(x => x.e.nombre + " " + x.c),
+  ["Cristina V3", "Gustavo V2", "Nacho V2", "Alfonso V1", "Cristobal V1"], "vacaciones: V3, luego V2 y luego V1; dentro de cada una, quien más días de vacaciones (los permisos no cuentan)");
+const asigP = { "1|2026-10-20": "AP", "2|2026-10-20": "CH", "3|2026-10-20": "CJ" };
+eq(recomendarQuitar(emps, codsV, asigP, dias, { 1: { p: 2, v: 40 }, 2: { p: 1, v: 0 }, 3: { p: 5, v: 0 } }, "2026-10-20").map(x => x.e.nombre),
+  ["Nacho", "Cristobal", "Cristina"], "permisos: AP, CJ, CH y JS se cuentan juntos; las vacaciones no suman");
 eq(r.find(x => x.e.nombre === "Nacho").racha, 2, "racha del permiso de 2 días");
 eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 4, false), "⚠️ Tercio superado el 20/10: 5 de 4", "aviso al equipo: día y cuántos");
 eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 4, true), "⚠️ Tercio superado el 20/10: 5 de 4. Debe quitarse: Cristobal (AP)", "aviso a responsables: además quién debe quitarse");
-eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 3, true), "⚠️ Tercio superado el 20/10: 5 de 3. Deben quitarse 2: Cristobal (AP), Nacho (CJ)", "si sobran 2, nombra a 2");
+eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 3, true), "⚠️ Tercio superado el 20/10: 5 de 3. Deben quitarse 2: 1º Cristobal (AP), 2º Nacho (CJ)", "si sobran 2, nombra a 2");
 eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 5, true), null, "con tercio 5 y 5 personas no se supera");
 eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-21", 4, true), null, "un día con pocas ausencias no avisa");
 const codsJS = { ...cods, JS: { tipo: "Ausencia Justificada" } };

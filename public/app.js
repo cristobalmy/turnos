@@ -370,13 +370,14 @@ async function cargarAnio(y) {
 }
 const esAus = c => !!(c && S.cods[c] && S.cods[c].tipo === "Ausencia Justificada");
 const esVac = c => ["V1", "V2", "V3"].includes(c);
-// Al superar el tercio se quitan primero los permisos (AP, CJ, CH, SS, NAV…), después los JS (juicio saliente)
-// y por último las vacaciones.
-const nivelQuitar = c => esVac(c) ? 2 : c === "JS" ? 1 : 0;
-// Días de ausencia justificada ya disfrutados (anteriores a hoy) por persona en el año actual.
-function diasCogidos(empId) {
-  const hoy = hoyStr(), y = +hoy.slice(0, 4);
-  return (S.infAnio[y] || []).filter(r => r.empleado_id === empId && r.fecha < hoy && esAus(r.codigo)).length;
+// Al superar el tercio se quitan, por este orden: los permisos (AP, CJ, CH, SS, NAV…), los JS (juicio saliente),
+// y por último las vacaciones, que entre ellas tienen prioridad V1 sobre V2 y V2 sobre V3 (se quita antes V3).
+const nivelQuitar = c => ({ V3: 2, V2: 3, V1: 4 })[c] ?? (c === "JS" ? 1 : 0);
+// Días ya disfrutados (anteriores a hoy) en el año actual, contados aparte: vacaciones por un lado
+// y permisos (AP, CJ, CH, JS…) por otro, según el código del día que se mira.
+function diasCogidos(empId, c) {
+  const hoy = hoyStr(), y = +hoy.slice(0, 4), vac = esVac(c);
+  return (S.infAnio[y] || []).filter(r => r.empleado_id === empId && r.fecha < hoy && esAus(r.codigo) && esVac(r.codigo) === vac).length;
 }
 // Días de servicio seguidos de ausencia que incluyen el día f (los días libres del ciclo no cortan la racha).
 function rachaAusencia(empId, f, A = R.asig, D = R.dias) {
@@ -392,11 +393,12 @@ function rachaAusencia(empId, f, A = R.asig, D = R.dias) {
   }
   return n;
 }
-// Recomendación (orden de "quién debe quitarse"): 1) permisos, luego JS y por último vacaciones; 2) dentro de cada grupo, quien más días ha disfrutado este año; 3) orden de la lista.
+// Recomendación (orden de "quién debe quitarse"): 1) permisos, JS, V3, V2 y V1; 2) dentro de cada uno, quien más días ha disfrutado
+// este año (vacaciones o permisos, contados aparte); 3) orden de la lista.
 function recomendarQuitar(f, A = R.asig, D = R.dias) {
   const lista = S.emps.filter(e => esAus(A[e.id + "|" + f])).map(e => {
     const c = A[e.id + "|" + f];
-    return { e, c, vac: nivelQuitar(c), racha: rachaAusencia(e.id, f, A, D), tot: diasCogidos(e.id) };
+    return { e, c, vac: nivelQuitar(c), racha: rachaAusencia(e.id, f, A, D), tot: diasCogidos(e.id, c) };
   });
   lista.sort((a, b) => a.vac - b.vac || b.tot - a.tot || a.e.orden - b.e.orden);
   return lista;
@@ -433,11 +435,11 @@ function panelBloque(titulo, k, clase) {
         if (f < hoy || tercioR(f) <= S.tercio) return h("td", {});
         const r = recomendarQuitar(f); if (!r.length) return h("td", {});
         // Se nombra a tantas personas como sobran, por orden de preferencia
-        const sobran = tercioR(f) - S.tercio, fuera = r.slice(0, sobran), luego = r.slice(sobran, sobran + 2), pl = n => n === 1 ? "" : "s";
+        const sobran = tercioR(f) - S.tercio, fuera = r.slice(0, sobran), luego = r.slice(sobran), pl = n => n === 1 ? "" : "s";
         return h("td", {}, h("small", {}, sobran > 1 ? `deben quitarse ${sobran}` : "recomendado"),
-          fuera.map(x => [h("div", {}, h("b", {}, x.e.nombre)),
-            h("small", {}, `${x.c} · ${x.tot} día${pl(x.tot)} disfrutado${pl(x.tot)} este año`)]),
-          luego.length ? h("small", {}, "luego " + luego.map(y => y.e.nombre).join(", ")) : null);
+          fuera.map((x, i) => [h("div", {}, h("b", {}, `${i + 1}º ${x.e.nombre}`)),
+            h("small", {}, `${x.c} · ${x.tot} día${pl(x.tot)} de ${esVac(x.c) ? "vacaciones" : "permisos"} este año`)]),
+          luego.length ? h("small", {}, "luego " + luego.map((y, i) => `${sobran + i + 1}º ${y.e.nombre}`).join(", ")) : null);
       }) : null));
   return h("section", { class: "bloque " + clase },
     h("h3", {}, titulo, h("small", {}, ` · ${fechaCorta(fechas[0])} – ${fechaCorta(fechas[5])}`)),
@@ -610,18 +612,18 @@ function bloqueQuitar() {
     const n = enTercio(f);
     if (n <= S.tercio) continue;
     const r = recomendarQuitar(f, S.asig, S.diasExt || S.dias), sobran = n - S.tercio;
-    const fuera = r.slice(0, sobran), luego = r.slice(sobran, sobran + 2);
+    const fuera = r.slice(0, sobran), luego = r.slice(sobran);
     lineas.push(h("div", { class: "pl" + (f === S.sel ? " sel" : ""), title: "Ver este día", onclick: () => { S.sel = f; pintar(); } },
       h("span", { class: "pe" }, `${DSEM[new Date(S.y, S.m, d).getDay()]} ${d}/${S.m + 1}`),
       h("span", { class: "pv" },
         h("span", { class: "exceso" }, `${n} de ${S.tercio}`), " ",
         fuera.length ? [sobran > 1 ? `Deben quitarse ${sobran}: ` : "Debe quitarse: ",
-          fuera.map((x, i) => [i ? ", " : "", h("b", {}, x.e.nombre), h("small", {}, ` (${x.c} · ${x.tot} día${pl(x.tot)} disfrutado${pl(x.tot)} este año)`)])] : "sin candidatos",
-        luego.length ? h("small", {}, " · luego " + luego.map(x => x.e.nombre).join(", ")) : null)));
+          fuera.map((x, i) => [i ? ", " : "", h("b", {}, `${i + 1}º ${x.e.nombre}`), h("small", {}, ` (${x.c} · ${x.tot} día${pl(x.tot)} de ${esVac(x.c) ? "vacaciones" : "permisos"} este año)`)])] : "sin candidatos",
+        luego.length ? h("small", {}, " · luego " + luego.map((x, i) => `${sobran + i + 1}º ${x.e.nombre} (${x.c} · ${x.tot})`).join(", ")) : null)));
   }
   return h("div", { class: "picoreco quitareco" }, h("div", { class: "pt" }, "Tercio superado: quién debe quitarse"),
     lineas.length ? lineas : h("div", { class: "pl" }, h("span", { class: "pv" }, S.y === +hoy.slice(0, 4) && S.m === +hoy.slice(5, 7) - 1 ? "Ningún día que queda de este mes supera el tercio." : "Ningún día de este mes supera el tercio.")),
-    h("small", { class: "det" }, "Solo días de hoy en adelante. Se quitan primero los permisos (AP, CJ, CH…), después los JS y por último las vacaciones; dentro de cada grupo, quien más días de vacaciones y permisos ha disfrutado este año. Toca un día para ver su resumen."));
+    h("small", { class: "det" }, "Solo días de hoy en adelante. Orden para quitarse: permisos (AP, CJ, CH), JS, V3, V2 y por último V1. Dentro de cada uno, primero quien más días lleva este año: los AP, CJ, CH y JS se suman juntos; las vacaciones se cuentan aparte. El número entre paréntesis son esos días. Toca un día para ver su resumen."));
 }
 
 const GRUPOS = [["a", "Vacaciones y permisos"], ["t", "Trabajo"], ["m", "Modificadores"], ["e", "Otros"]];
