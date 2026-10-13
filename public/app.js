@@ -181,9 +181,13 @@ async function salir() { await sb.auth.signOut(); if (S.canal) sb.removeChannel(
 // ---------- datos del mes ----------
 async function cargarMes() {
   const desde = fechaStr(S.y, S.m, 1), hasta = fechaStr(S.y, S.m, new Date(S.y, S.m + 1, 0).getDate());
-  const a = await sb.from("asignaciones").select("empleado_id,fecha,codigo").gte("fecha", desde).lte("fecha", hasta);
+  // Se carga un mes de margen a cada lado para saber cuántos días seguidos lleva cada ausencia (recomendación del tercio).
+  const fd = x => fechaStr(x.getFullYear(), x.getMonth(), x.getDate());
+  const ext0 = fd(new Date(S.y, S.m - 1, 1)), ext1 = fd(new Date(S.y, S.m + 2, 0));
+  const a = await sb.from("asignaciones").select("empleado_id,fecha,codigo").gte("fecha", ext0).lte("fecha", ext1);
   if (a.error) { toast("Error al cargar el mes"); return; }
   S.dias = diasRango(desde, hasta);
+  S.diasExt = diasRango(ext0, ext1);
   S.asig = Object.fromEntries(a.data.map(x => [x.empleado_id + "|" + x.fecha, x.codigo]));
   cargarNotas(desde, hasta).then(() => { if (S.vista === "cal") pintar(); });
   // Hoy y mañana también (para la recomendación de pico), aunque se esté viendo otro mes.
@@ -372,24 +376,24 @@ function diasCogidos(empId) {
   return (S.infAnio[y] || []).filter(r => r.empleado_id === empId && r.fecha < hoy && esAus(r.codigo)).length;
 }
 // Días de servicio seguidos de ausencia que incluyen el día f (los días libres del ciclo no cortan la racha).
-function rachaAusencia(empId, f) {
+function rachaAusencia(empId, f, A = R.asig, D = R.dias) {
   const mas = (n) => { const [y, m, d] = f.split("-").map(Number), t = new Date(y, m - 1, d + n); return fechaStr(t.getFullYear(), t.getMonth(), t.getDate()); };
   let n = 1;
   for (const paso of [-1, 1]) {
     for (let i = 1; i < 60; i++) {
-      const g = mas(paso * i), t = R.dias[g];
+      const g = mas(paso * i), t = D[g];
       if (!t) break;
       if (t === "S" || t === "L") continue;
-      if (esAus(R.asig[empId + "|" + g])) n++; else break;
+      if (esAus(A[empId + "|" + g])) n++; else break;
     }
   }
   return n;
 }
 // Recomendación (orden de "quién debe quitarse"): 1) permisos antes que vacaciones, 2) racha más corta, 3) más días cogidos en el año.
-function recomendarQuitar(f) {
-  const lista = S.emps.filter(e => esAus(R.asig[e.id + "|" + f])).map(e => {
-    const c = R.asig[e.id + "|" + f];
-    return { e, c, vac: esVac(c) ? 1 : 0, racha: rachaAusencia(e.id, f), tot: diasCogidos(e.id) };
+function recomendarQuitar(f, A = R.asig, D = R.dias) {
+  const lista = S.emps.filter(e => esAus(A[e.id + "|" + f])).map(e => {
+    const c = A[e.id + "|" + f];
+    return { e, c, vac: esVac(c) ? 1 : 0, racha: rachaAusencia(e.id, f, A, D), tot: diasCogidos(e.id) };
   });
   lista.sort((a, b) => a.vac - b.vac || a.racha - b.racha || b.tot - a.tot || a.e.orden - b.e.orden);
   return lista;
@@ -583,8 +587,36 @@ function vistaCalendario() {
     bloquePico(),
     h("div", { style: "height:.7rem" }),
     h("div", { class: "wrap" }, h("table", { class: "cal" + (S.fsel ? " conSel" : "") }, thead, tbody, tfoot)),
+    bloqueQuitar(),
     h("div", { class: "leyenda" }, h("span", { class: "a" }, "Vacaciones y permisos"), h("span", { class: "t" }, "Trabajo"), h("span", { class: "m" }, "Modificadores (PICO, DESP)"), h("span", { class: "e" }, "Otros"), h("span", { class: "l" }, "Día libre (L)"),
       h("span", {}, (esResp() ? "Toca una casilla para poner o quitar un código. " : "Toca una casilla tuya para poner o quitar un código. ") + "Toca un nombre para resaltar su fila y un día arriba para ver su resumen.")));
+}
+
+// Debajo del calendario: días del mes (de hoy en adelante) que superan el tercio y quién debería quitarse.
+function bloqueQuitar() {
+  const hoy = hoyStr(), nd = new Date(S.y, S.m + 1, 0).getDate();
+  const ultimo = fechaStr(S.y, S.m, nd);
+  if (ultimo < hoy) return null;                       // mes ya pasado: no se puede cambiar nada
+  const pl = n => n === 1 ? "" : "s";
+  const lineas = [];
+  for (let d = 1; d <= nd; d++) {
+    const f = fechaStr(S.y, S.m, d);
+    if (f < hoy || !["M", "T", "N"].includes(S.dias[f])) continue;
+    const n = enTercio(f);
+    if (n <= S.tercio) continue;
+    const r = recomendarQuitar(f, S.asig, S.diasExt || S.dias), sobran = n - S.tercio;
+    const fuera = r.slice(0, sobran), luego = r.slice(sobran, sobran + 2);
+    lineas.push(h("div", { class: "pl" + (f === S.sel ? " sel" : ""), title: "Ver este día", onclick: () => { S.sel = f; pintar(); } },
+      h("span", { class: "pe" }, `${DSEM[new Date(S.y, S.m, d).getDay()]} ${d}/${S.m + 1}`),
+      h("span", { class: "pv" },
+        h("span", { class: "exceso" }, `${n} de ${S.tercio}`), " ",
+        fuera.length ? [sobran > 1 ? `Deben quitarse ${sobran}: ` : "Debe quitarse: ",
+          fuera.map((x, i) => [i ? ", " : "", h("b", {}, x.e.nombre), h("small", {}, ` (${x.c} · ${x.racha} día${pl(x.racha)} seguido${pl(x.racha)} · ${x.tot} este año)`)])] : "sin candidatos",
+        luego.length ? h("small", {}, " · luego " + luego.map(x => x.e.nombre).join(", ")) : null)));
+  }
+  return h("div", { class: "picoreco quitareco" }, h("div", { class: "pt" }, "Tercio superado: quién debe quitarse"),
+    lineas.length ? lineas : h("div", { class: "pl" }, h("span", { class: "pv" }, S.y === +hoy.slice(0, 4) && S.m === +hoy.slice(5, 7) - 1 ? "Ningún día que queda de este mes supera el tercio." : "Ningún día de este mes supera el tercio.")),
+    h("small", { class: "det" }, "Solo días de hoy en adelante. Se quitan antes los permisos (AP, CJ, CH…) que las vacaciones; entre ellos, quien lleva menos días seguidos y, después, quien más días ha cogido este año. Toca un día para ver su resumen."));
 }
 
 const GRUPOS = [["a", "Vacaciones y permisos"], ["t", "Trabajo"], ["m", "Modificadores"], ["e", "Otros"]];
