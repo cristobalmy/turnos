@@ -370,6 +370,9 @@ async function cargarAnio(y) {
 }
 const esAus = c => !!(c && S.cods[c] && S.cods[c].tipo === "Ausencia Justificada");
 const esVac = c => ["V1", "V2", "V3"].includes(c);
+// Al superar el tercio se quitan primero los permisos (AP, CJ, CH, SS, NAV…), después los JS (juicio saliente)
+// y por último las vacaciones.
+const nivelQuitar = c => esVac(c) ? 2 : c === "JS" ? 1 : 0;
 // Días de ausencia justificada ya disfrutados (anteriores a hoy) por persona en el año actual.
 function diasCogidos(empId) {
   const hoy = hoyStr(), y = +hoy.slice(0, 4);
@@ -389,11 +392,11 @@ function rachaAusencia(empId, f, A = R.asig, D = R.dias) {
   }
   return n;
 }
-// Recomendación (orden de "quién debe quitarse"): 1) permisos antes que vacaciones, 2) racha más corta, 3) más días cogidos en el año.
+// Recomendación (orden de "quién debe quitarse"): 1) permisos, luego JS y por último vacaciones, 2) racha más corta, 3) más días cogidos en el año.
 function recomendarQuitar(f, A = R.asig, D = R.dias) {
   const lista = S.emps.filter(e => esAus(A[e.id + "|" + f])).map(e => {
     const c = A[e.id + "|" + f];
-    return { e, c, vac: esVac(c) ? 1 : 0, racha: rachaAusencia(e.id, f, A, D), tot: diasCogidos(e.id) };
+    return { e, c, vac: nivelQuitar(c), racha: rachaAusencia(e.id, f, A, D), tot: diasCogidos(e.id) };
   });
   lista.sort((a, b) => a.vac - b.vac || a.racha - b.racha || b.tot - a.tot || a.e.orden - b.e.orden);
   return lista;
@@ -618,7 +621,7 @@ function bloqueQuitar() {
   }
   return h("div", { class: "picoreco quitareco" }, h("div", { class: "pt" }, "Tercio superado: quién debe quitarse"),
     lineas.length ? lineas : h("div", { class: "pl" }, h("span", { class: "pv" }, S.y === +hoy.slice(0, 4) && S.m === +hoy.slice(5, 7) - 1 ? "Ningún día que queda de este mes supera el tercio." : "Ningún día de este mes supera el tercio.")),
-    h("small", { class: "det" }, "Solo días de hoy en adelante. Se quitan antes los permisos (AP, CJ, CH…) que las vacaciones; entre ellos, quien lleva menos días seguidos y, después, quien más días ha cogido este año. Toca un día para ver su resumen."));
+    h("small", { class: "det" }, "Solo días de hoy en adelante. Se quitan primero los permisos (AP, CJ, CH…), después los JS y por último las vacaciones; entre ellos, quien lleva menos días seguidos y, después, quien más días ha cogido este año. Toca un día para ver su resumen."));
 }
 
 const GRUPOS = [["a", "Vacaciones y permisos"], ["t", "Trabajo"], ["m", "Modificadores"], ["e", "Otros"]];

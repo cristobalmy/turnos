@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 const trozo = (ruta, ini, fin) => readFileSync(new URL(ruta, import.meta.url), "utf8").split(ini)[1].split(fin)[0];
 const av = trozo("../supabase/functions/avisar/index.ts", "// ===== INICIO LÓGICA TERCIO (se prueba por separado) =====", "// ===== FIN LÓGICA TERCIO =====");
-const { avisoTercio, recomendarQuitar, turnoCiclo, diasCiclo } = new Function('function fechaCorta(f){const p=f.split("-");return Number(p[2])+"/"+Number(p[1]);}' + av + "; return { avisoTercio, recomendarQuitar, turnoCiclo, diasCiclo };")();
+const { lineaTercio, recomendarQuitar, turnoCiclo, diasCiclo } = new Function('function fechaCorta(f){const p=f.split("-");return Number(p[2])+"/"+Number(p[1]);}' + av + "; return { lineaTercio, recomendarQuitar, turnoCiclo, diasCiclo };")();
 const ics = trozo("../supabase/functions/calendario/index.ts", "// ===== INICIO LÓGICA ICS (se prueba por separado) =====", "// ===== FIN LÓGICA ICS =====");
 const { construirIcs } = new Function(ics + "; return { construirIcs };")();
 let fallos = 0;
@@ -19,10 +19,14 @@ const totales = { 1: 3, 4: 0 };
 const r = recomendarQuitar(emps, cods, asig, dias, totales, "2026-10-20");
 eq(r.map(x => x.e.nombre), ["Cristobal", "Gustavo", "Nacho", "Alfonso", "Cristina"], "orden: permisos primero (más días cogidos, luego racha), vacaciones al final y entre ellas la racha más corta antes");
 eq(r[2].racha, 2, "racha del permiso de 2 días");
-eq(avisoTercio(emps, cods, asig, dias, totales, "2026-10-20", 4, 4).body, "Tercio superado el 20/10 (5 de 4). Recomendado quitarse: Cristobal (AP)", "mensaje al pasar el tercio");
-eq(avisoTercio(emps, cods, asig, dias, totales, "2026-10-20", 4, 5), null, "si ya estaba pasado, no vuelve a avisar");
-eq(avisoTercio(emps, cods, asig, dias, totales, "2026-10-20", 5, 4), null, "con tercio 5 y 5 personas no se supera");
-eq(avisoTercio(emps, cods, asig, dias, totales, "2026-10-21", 4, 0), null, "un día con pocas ausencias no avisa");
+eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 4, false), "⚠️ Tercio superado el 20/10: 5 de 4", "aviso al equipo: día y cuántos");
+eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 4, true), "⚠️ Tercio superado el 20/10: 5 de 4. Debe quitarse: Cristobal (AP)", "aviso a responsables: además quién debe quitarse");
+eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 3, true), "⚠️ Tercio superado el 20/10: 5 de 3. Deben quitarse 2: Cristobal (AP), Gustavo (AP)", "si sobran 2, nombra a 2");
+eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-20", 5, true), null, "con tercio 5 y 5 personas no se supera");
+eq(lineaTercio(emps, cods, asig, dias, totales, "2026-10-21", 4, true), null, "un día con pocas ausencias no avisa");
+const codsJS = { ...cods, JS: { tipo: "Ausencia Justificada" } };
+const asigJS = { "1|2026-10-20": "JS", "2|2026-10-20": "V1", "3|2026-10-20": "CJ", "4|2026-10-20": "AP" };
+eq(recomendarQuitar(emps, codsJS, asigJS, dias, {}, "2026-10-20").map(x => x.c), ["CJ", "AP", "JS", "V1"], "JS: se quita después de AP/CJ/CH y antes que las vacaciones");
 // rachas que saltan los días libres del ciclo: S/L no cortan
 const dias2 = { "2026-10-19": "N", "2026-10-20": "S", "2026-10-21": "L", "2026-10-22": "M" };
 const asig2 = { "1|2026-10-19": "V1", "1|2026-10-22": "V1" };

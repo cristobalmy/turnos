@@ -1,11 +1,14 @@
 // @ts-nocheck
 // Edge Function "avisar": cuando alguien cambia un código, avisa al móvil de la gente de ese mismo distrito.
+// El mensaje dice quién, qué código y qué día; si ese día queda por encima del tercio, lo avisa
+// (y a los responsables, además, les dice quién debería quitarse).
 // Secretos necesarios (Edge Functions → Secrets): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT, AVISO_SECRET.
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import webpush from "npm:web-push@3.6.7";
 
 // ===== INICIO LÓGICA DEL MENSAJE (se prueba por separado) =====
-function fechaCorta(f) { const p = f.split("-"); return Number(p[2]) + "/" + Number(p[1]); }
+const DSEM3 = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+function fechaCorta(f) { const p = f.split("-").map(Number); return DSEM3[new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay()] + " " + p[2] + "/" + p[1]; }
 
 // cambios: filas de la tabla "cambios"; nombre: id -> nombre. Devuelve { title, body }.
 function construirMensaje(cambios, nombre, actor, titulo = "Tercio") {
@@ -43,6 +46,8 @@ function diasCiclo(desde, hasta, letra) { const o = {}; for (let f = desde; f <=
 function masDias(f, n) { const p = f.split("-").map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)).toISOString().slice(0, 10); }
 function esAus(cods, c) { return !!(c && cods[c] && cods[c].tipo === "Ausencia Justificada"); }
 function esVac(c) { return c === "V1" || c === "V2" || c === "V3"; }
+// Se quitan primero los permisos (AP, CJ, CH, SS, NAV…), después los JS (juicio saliente) y por último las vacaciones.
+function nivelQuitar(c) { return esVac(c) ? 2 : c === "JS" ? 1 : 0; }
 // asig: "idEmpleado|fecha" -> código; dias: fecha -> turno (M T N S L)
 function contarTercio(emps, cods, asig, f) { return emps.filter((e) => esAus(cods, asig[e.id + "|" + f])).length; }
 // Días de servicio seguidos de ausencia que incluyen el día f (los días libres del ciclo no cortan la racha).
@@ -58,29 +63,33 @@ function rachaAusencia(cods, asig, dias, empId, f) {
   }
   return n;
 }
-// Orden de "quién debe quitarse": 1) permisos antes que vacaciones, 2) racha más corta, 3) más días ya disfrutados este año.
+// Orden de "quién debe quitarse": 1) permisos, luego JS y por último vacaciones, 2) racha más corta, 3) más días ya disfrutados este año.
 function recomendarQuitar(emps, cods, asig, dias, totales, f) {
   const lista = emps.filter((e) => esAus(cods, asig[e.id + "|" + f])).map((e) => {
     const c = asig[e.id + "|" + f];
-    return { e, c, vac: esVac(c) ? 1 : 0, racha: rachaAusencia(cods, asig, dias, e.id, f), tot: totales[e.id] || 0 };
+    return { e, c, vac: nivelQuitar(c), racha: rachaAusencia(cods, asig, dias, e.id, f), tot: totales[e.id] || 0 };
   });
   lista.sort((a, b) => a.vac - b.vac || a.racha - b.racha || b.tot - a.tot || a.e.orden - b.e.orden);
   return lista;
 }
-// antes: personas en el tercio ese día justo antes de este cambio. Devuelve el aviso, o null si no se acaba de superar.
-function avisoTercio(emps, cods, asig, dias, totales, f, tercio, antes) {
-  const ahora = contarTercio(emps, cods, asig, f);
-  if (!(antes <= tercio && ahora > tercio)) return null;
-  const r = recomendarQuitar(emps, cods, asig, dias, totales, f);
-  let body = "Tercio superado el " + fechaCorta(f) + " (" + ahora + " de " + tercio + ")";
-  if (r.length) body += ". Recomendado quitarse: " + r[0].e.nombre + " (" + r[0].c + ")";
-  return { title: "Tercio superado", body };
+// Línea que se añade al aviso si el día f queda por encima del tercio (o null si no).
+// conQuitar: para los responsables, añade a quién(es) se recomienda quitar (tantas personas como sobren).
+function lineaTercio(emps, cods, asig, dias, totales, f, tercio, conQuitar) {
+  const n = contarTercio(emps, cods, asig, f);
+  if (n <= tercio) return null;
+  let t = "⚠️ Tercio superado el " + fechaCorta(f) + ": " + n + " de " + tercio;
+  if (conQuitar) {
+    const sobran = n - tercio, r = recomendarQuitar(emps, cods, asig, dias, totales, f).slice(0, sobran);
+    if (r.length) t += ". " + (sobran > 1 ? "Deben quitarse " + sobran + ": " : "Debe quitarse: ") + r.map((x) => x.e.nombre + " (" + x.c + ")").join(", ");
+  }
+  return t;
 }
 // ===== FIN LÓGICA TERCIO =====
 
 Deno.serve(async (req) => {
   if (req.headers.get("x-aviso-secret") !== Deno.env.get("AVISO_SECRET")) return new Response("no autorizado", { status: 401 });
-  const { hecho_por } = await req.json();
+  const { hecho_por, prueba } = await req.json();
+  if (prueba) return await avisoPrueba(prueba);
   if (!hecho_por) return new Response("sin autor", { status: 400 });
 
   // Espera unos segundos: si alguien apunta varios días seguidos, salen todos en un solo aviso.
@@ -93,7 +102,7 @@ Deno.serve(async (req) => {
   if (error) return new Response(error.message, { status: 500 });
   if (!cambios || !cambios.length) return new Response("nada que avisar");
 
-  const { data: emps } = await sb.from("empleados").select("id,nombre,orden,rol,activo,distrito_id");
+  const { data: emps } = await sb.from("empleados").select("id,nombre,orden,rol,admin,activo,distrito_id");
   const nombre = Object.fromEntries((emps || []).map((e) => [e.id, e.nombre]));
   const distritoDe = Object.fromEntries((emps || []).map((e) => [e.id, e.distrito_id]));
   const { data: ds } = await sb.from("distritos").select("*");
@@ -123,20 +132,72 @@ Deno.serve(async (req) => {
     if (!porDistrito.has(d)) porDistrito.set(d, []);
     porDistrito.get(d).push(c);
   }
-  let enviados = 0, alertas = 0, total = 0;
+  let enviados = 0, total = 0;
+  const informe = [];
   for (const [did, lista] of porDistrito) {
     const dist = distritos[did] || { nombre: "Tercio", letra: "D", turno: "", tercio: 4 };
     const suyos = (emps || []).filter((e) => e.distrito_id === did && e.activo !== false);
+    const resp = new Set(suyos.filter((e) => e.rol === "responsable" || e.admin).map((e) => e.id));
     const ids = new Set(suyos.map((e) => e.id));
     const subs = (todasSubs || []).filter((s) => ids.has(s.empleado_id));
     total += subs.length;
-    const titulo = (dist.nombre + " " + (dist.turno || "")).trim();
-    enviados += await enviar(subs, construirMensaje(lista, nombre, hecho_por, titulo), "cambio-" + hecho_por + "-" + did);
-    // Aviso a los responsables de ese distrito si algún día futuro acaba de superar el tercio
-    try { alertas += await alertarTercio(sb, lista, suyos, dist, enviar); } catch (e) { console.error("fallo en la alerta de tercio", e && e.message); }
+    const base = construirMensaje(lista, nombre, hecho_por, (dist.nombre + " " + (dist.turno || "")).trim());
+    let ter = { todos: [], resp: [] };
+    try { ter = await tercioDelCambio(sb, lista, suyos, dist); } catch (e) { console.error("fallo al mirar el tercio", e && e.message); }
+    const conLineas = (lin) => (lin.length ? { title: base.title, body: base.body + "\n" + lin.join("\n") } : base);
+    const tag = "cambio-" + hecho_por + "-" + did + "-" + Date.now();
+    enviados += await enviar(subs.filter((s) => !resp.has(s.empleado_id)), conLineas(ter.todos), tag);
+    enviados += await enviar(subs.filter((s) => resp.has(s.empleado_id)), conLineas(ter.resp), tag);
+    informe.push(base.body.replace(/\n/g, " / ") + (ter.todos.length ? " / " + ter.todos.join(" / ") : ""));
   }
-  return new Response(`avisados ${enviados} de ${total}; alertas de tercio ${alertas}`);
+  return new Response(`avisados ${enviados} de ${total} móviles\n${informe.join("\n")}`);
 });
+
+// Prueba: manda un aviso a los móviles de una persona y cuenta lo que pasa (lo usa la comprobación de la migración 018).
+async function avisoPrueba(empleadoId) {
+  const sb = createClient(Deno.env.get("SUPABASE_URL"), Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
+  const { data: subs, error } = await sb.from("push_subs").select("*").eq("empleado_id", empleadoId);
+  if (error) return new Response("error leyendo móviles: " + error.message, { status: 500 });
+  webpush.setVapidDetails(Deno.env.get("VAPID_SUBJECT"), Deno.env.get("VAPID_PUBLIC_KEY"), Deno.env.get("VAPID_PRIVATE_KEY"));
+  const payload = JSON.stringify({ title: "Tercio", body: "Aviso de prueba desde el servidor ✔", tag: "prueba-" + Date.now(), url: "./" });
+  let ok = 0; const fallos = [];
+  for (const s of subs || []) {
+    try { await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload); ok++; }
+    catch (e) {
+      fallos.push((e && e.statusCode) + " " + String((e && e.body) || (e && e.message) || "").slice(0, 80));
+      if (e && (e.statusCode === 404 || e.statusCode === 410)) await sb.from("push_subs").delete().eq("endpoint", s.endpoint);
+    }
+  }
+  return new Response(`prueba: ${(subs || []).length} móviles apuntados, ${ok} enviados` + (fallos.length ? "; fallos: " + fallos.join(" | ") : ""));
+}
+
+// Mira los días tocados (de hoy en adelante y de servicio) y devuelve las líneas de tercio superado:
+// "todos" para el equipo y "resp" (con quién debe quitarse) para los responsables.
+async function tercioDelCambio(sb, cambios, emps, dist) {
+  const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+  const fechas = [...new Set(cambios.map((c) => c.fecha))].filter((f) => f >= hoy).sort();
+  const out = { todos: [], resp: [] };
+  if (!fechas.length) return out;
+  const { data: cd } = await sb.from("codigos").select("codigo,tipo");
+  const cods = Object.fromEntries((cd || []).map((c) => [c.codigo, c]));
+  const tercio = dist.tercio || 4, misIds = emps.map((e) => e.id);
+  const desde = masDias(fechas[0], -30), hasta = masDias(fechas[fechas.length - 1], 30);
+  const filas = await leerTodo(() => sb.from("asignaciones").select("empleado_id,fecha,codigo").in("empleado_id", misIds).gte("fecha", desde).lte("fecha", hasta).order("fecha").order("empleado_id"));
+  const asig = Object.fromEntries(filas.map((x) => [x.empleado_id + "|" + x.fecha, x.codigo]));
+  const dias = diasCiclo(desde, hasta, dist.letra);
+  const año = hoy.slice(0, 4);
+  const pasadas = await leerTodo(() => sb.from("asignaciones").select("empleado_id,fecha,codigo").in("empleado_id", misIds).gte("fecha", año + "-01-01").lt("fecha", hoy).order("fecha").order("empleado_id"));
+  const totales = {};
+  for (const r of pasadas) if (esAus(cods, r.codigo)) totales[r.empleado_id] = (totales[r.empleado_id] || 0) + 1;
+  for (const f of fechas.slice(0, 4)) {
+    if (!["M", "T", "N"].includes(dias[f])) continue;   // el tercio solo cuenta en días de servicio
+    const a = lineaTercio(emps, cods, asig, dias, totales, f, tercio, false);
+    if (!a) continue;
+    out.todos.push(a);
+    out.resp.push(lineaTercio(emps, cods, asig, dias, totales, f, tercio, true));
+  }
+  return out;
+}
 
 async function leerTodo(consulta) {
   const out = [];
@@ -147,40 +208,4 @@ async function leerTodo(consulta) {
     if (data.length < 1000) break;
   }
   return out;
-}
-
-async function alertarTercio(sb, cambios, emps, dist, enviar) {
-  const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
-  const { data: cd } = await sb.from("codigos").select("codigo,tipo");
-  const cods = Object.fromEntries((cd || []).map((c) => [c.codigo, c]));
-  const tercio = dist.tercio || 4;
-  const misIds = emps.map((e) => e.id);
-  // Variación por día: +1 si se añade una ausencia justificada, -1 si se quita
-  const delta = new Map();
-  for (const c of cambios) {
-    if (c.fecha < hoy) continue;
-    const d = (esAus(cods, c.codigo_despues) ? 1 : 0) - (esAus(cods, c.codigo_antes) ? 1 : 0);
-    if (d !== 0) delta.set(c.fecha, (delta.get(c.fecha) || 0) + d);
-  }
-  if (!delta.size) return 0;
-  const ids = emps.filter((e) => e.rol === "responsable").map((e) => e.id);
-  if (!ids.length) return 0;
-  const { data: subs } = await sb.from("push_subs").select("*").in("empleado_id", ids);
-  if (!subs || !subs.length) return 0;
-  const año = hoy.slice(0, 4);
-  const pasadas = await leerTodo(() => sb.from("asignaciones").select("empleado_id,fecha,codigo").in("empleado_id", misIds).gte("fecha", año + "-01-01").lt("fecha", hoy).order("fecha").order("empleado_id"));
-  const totales = {};
-  for (const r of pasadas) if (esAus(cods, r.codigo)) totales[r.empleado_id] = (totales[r.empleado_id] || 0) + 1;
-  let enviadas = 0;
-  for (const [f, d] of delta) {
-    const { data: filas } = await sb.from("asignaciones").select("empleado_id,fecha,codigo").in("empleado_id", misIds)
-      .gte("fecha", masDias(f, -30)).lte("fecha", masDias(f, 30));
-    const mapaDias = diasCiclo(masDias(f, -30), masDias(f, 30), dist.letra);
-    if (!["M", "T", "N"].includes(mapaDias[f])) continue;   // el tercio solo cuenta en días de servicio
-    const asig = Object.fromEntries((filas || []).map((x) => [x.empleado_id + "|" + x.fecha, x.codigo]));
-    const ahora = contarTercio(emps, cods, asig, f);
-    const aviso = avisoTercio(emps, cods, asig, mapaDias, totales, f, tercio, ahora - d);
-    if (aviso) enviadas += await enviar(subs, aviso, "tercio-" + f);
-  }
-  return enviadas;
 }
