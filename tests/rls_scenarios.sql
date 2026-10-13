@@ -211,3 +211,12 @@ rollback;
 \echo == Migración 017: aviso del PICO
 select pg_temp.chk((select count(*) from cron.job where jobname = 'aviso-pico' and schedule = '0 18,19 * * *') = 1, 'el aviso del PICO queda programado una sola vez');
 select pg_temp.chk((select command like '%functions/v1/pico%' and command like '%secreto-de-prueba%' from cron.job where jobname = 'aviso-pico'), 'llama a la función pico con el secreto de los avisos');
+
+\echo == Migración 018: los avisos esperan 30 segundos
+begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
+insert into asignaciones(empleado_id,fecha,codigo) values (4,'2027-05-03','V1');
+reset role;
+select pg_temp.chk((select espera from net.llamadas where body->>'hecho_por' = '4' order by espera desc limit 1) = 30000, 'el aviso de un cambio espera hasta 30 segundos');
+select pg_temp.chk((select headers->>'x-aviso-secret' from net.llamadas where body->>'hecho_por' = '4' limit 1) = 'secreto-de-prueba', 'y conserva el secreto');
+select pg_temp.chk((select command like '%timeout_milliseconds := 30000%' and command like '%secreto-de-prueba%' from cron.job where jobname = 'aviso-pico'), 'el aviso del PICO también espera 30 segundos');
+rollback;

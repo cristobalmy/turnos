@@ -10,6 +10,6 @@ grant execute on function auth.jwt() to anon, authenticated;
 -- Simula pg_net: en vez de llamar a internet, apunta la llamada en una tabla.
 create schema extensions;
 create schema net;
-create table net.llamadas(url text, headers jsonb, body jsonb);
-create function net.http_post(url text, headers jsonb, body jsonb) returns bigint language sql as
-  $$ insert into net.llamadas values (url, headers, body); select 1::bigint $$;
+create table net.llamadas(url text, headers jsonb, body jsonb, espera int);
+create function net.http_post(url text, headers jsonb, body jsonb, timeout_milliseconds int default 5000) returns bigint language sql as
+  $$ insert into net.llamadas values (url, headers, body, timeout_milliseconds); select 1::bigint $$;

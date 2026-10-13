@@ -12,11 +12,14 @@ begin
     secreto := substring(pg_get_functiondef('public.avisar_cambio'::regproc) from '''x-aviso-secret'',\s*''([^'']+)''');
   exception when others then secreto := null;
   end;
-  if secreto is not null then
+  if secreto is null then
+    raise exception 'No encuentro el secreto de los avisos. Avisa a Claude.';
+  else
     perform net.http_post(
       url     := 'https://exhushxtnbyyveflefgw.supabase.co/functions/v1/avisar',
       headers := jsonb_build_object('Content-Type', 'application/json', 'x-aviso-secret', secreto),
-      body    := '{"prueba": 1}'::jsonb);
+      body    := '{"prueba": 1}'::jsonb,
+      timeout_milliseconds := 30000);
   end if;
 end $$;
 
