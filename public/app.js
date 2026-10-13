@@ -429,10 +429,12 @@ function panelBloque(titulo, k, clase) {
       hayQuitar ? fila("Quitarse", "rq", f => {
         if (f < hoy || tercioR(f) <= S.tercio) return h("td", {});
         const r = recomendarQuitar(f); if (!r.length) return h("td", {});
-        const x = r[0], pl = n => n === 1 ? "" : "s";
-        return h("td", {}, h("small", {}, "recomendado"), h("div", {}, h("b", {}, x.e.nombre)),
-          h("small", {}, `${x.c} · ${x.racha} día${pl(x.racha)} seguido${pl(x.racha)} · ${x.tot} este año`),
-          r.length > 1 ? h("small", {}, "luego " + r.slice(1, 3).map(y => y.e.nombre).join(", ")) : null);
+        // Se nombra a tantas personas como sobran, por orden de preferencia
+        const sobran = tercioR(f) - S.tercio, fuera = r.slice(0, sobran), luego = r.slice(sobran, sobran + 2), pl = n => n === 1 ? "" : "s";
+        return h("td", {}, h("small", {}, sobran > 1 ? `deben quitarse ${sobran}` : "recomendado"),
+          fuera.map(x => [h("div", {}, h("b", {}, x.e.nombre)),
+            h("small", {}, `${x.c} · ${x.racha} día${pl(x.racha)} seguido${pl(x.racha)} · ${x.tot} este año`)]),
+          luego.length ? h("small", {}, "luego " + luego.map(y => y.e.nombre).join(", ")) : null);
       }) : null));
   return h("section", { class: "bloque " + clase },
     h("h3", {}, titulo, h("small", {}, ` · ${fechaCorta(fechas[0])} – ${fechaCorta(fechas[5])}`)),
