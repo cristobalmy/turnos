@@ -1022,11 +1022,9 @@ function vistaInformes() {
         h("table", { class: "ipicos" }, h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Picos"), h("th", {}, "Desplazado"), h("th", {}, "Último pico"))),
           h("tbody", {}, picosEmp.map(x => h("tr", {}, h("td", {}, x.e.nombre), h("td", {}, h("b", {}, x.n)), h("td", {}, x.d), h("td", {}, x.ult ? fechaLarga(x.ult) : "–"))))),
         null),
-      // «Mi año» al final y plegado (en el móvil ocupa mucho); se recuerda si lo dejaste abierto
+      // «Mi año» al final de la página, siempre abierto
       h("div", { class: "pag anchoanio" },
-        h("details", { class: "anioplegable", open: !!S.anioAbierto, ontoggle: ev => { S.anioAbierto = ev.target.open; } },
-          h("summary", {}, h("span", {}, S.infEmp === S.me.id ? "Mi año" : `Año de ${nombreEmp(S.infEmp)}`), h("small", {}, "los 12 meses")),
-          bloqueMiAnio(S.infEmp, S.infY))));
+        h("h2", {}, S.infEmp === S.me.id ? "Mi año" : `Año de ${nombreEmp(S.infEmp)}`), bloqueMiAnio(S.infEmp, S.infY)));
   };
   dibujar();
   cargarAnio(S.infY).then(dibujar);   // refresca al entrar

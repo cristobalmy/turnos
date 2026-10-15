@@ -391,9 +391,3 @@ dialog .dcab .btn{white-space:nowrap;flex:none}
 .infsel{flex:1;padding:.6rem .7rem;border:2px solid var(--azul2);border-radius:10px;background:var(--card);color:var(--txt);font-weight:700;font-size:1rem;text-transform:none;letter-spacing:0}
 @media (max-width:520px){.itot{grid-template-columns:1fr 1fr}}
 @media (max-width:560px){.anio12{grid-template-columns:minmax(0,1fr)}.md{min-height:34px;font-size:.8rem}.md i{font-size:.58rem}}
-details.anioplegable>summary{display:flex;align-items:center;gap:.6rem;cursor:pointer;list-style:none;font-size:1.25rem;font-weight:800;padding:.2rem 0}
-details.anioplegable>summary::-webkit-details-marker{display:none}
-details.anioplegable>summary small{font-size:.8rem;font-weight:600;color:var(--suave);flex:1}
-details.anioplegable>summary::after{content:"▾";font-size:1rem;color:var(--azul2);transition:transform .2s}
-details.anioplegable[open]>summary::after{transform:rotate(180deg)}
-details.anioplegable[open]>summary{margin-bottom:.4rem}
