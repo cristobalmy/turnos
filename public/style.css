@@ -227,7 +227,7 @@ table.res tbody th{width:4.6rem}
 /* informes */
 .pag.ancho{max-width:640px}
 .pag select{width:100%;padding:.55rem;margin:.3rem 0 .6rem;border:1px solid var(--borde);border-radius:10px;background:var(--card);color:inherit;font-size:1rem}
-.itot{display:flex;gap:1.6rem;margin:.4rem 0 .6rem}.itot div{display:flex;flex-direction:column}.itot b{font-size:1.7rem}.itot small{color:var(--suave)}
+.itot{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin:.4rem 0 .6rem}.itot div{background:var(--gris);border-radius:10px;padding:.5rem .6rem;text-align:center;align-items:center}.itot div{display:flex;flex-direction:column}.itot b{font-size:1.7rem}.itot small{color:var(--suave)}
 .icod{border-top:1px solid var(--linea)}.icod summary{display:grid;grid-template-columns:3.4em 1fr auto;gap:.5rem;align-items:center;padding:.4rem 0;cursor:pointer;list-style:none}
 .icod summary::-webkit-details-marker{display:none}.icod .cod{text-align:center}.idesc{color:var(--suave);font-size:.85rem}
 .ifechas{padding:0 0 .6rem 3.9em;color:var(--suave);font-size:.85rem;line-height:1.5}
@@ -387,3 +387,4 @@ dialog .dcab .btn{white-space:nowrap;flex:none}
 .infpersona{max-width:640px;margin:.2rem auto 0;padding:0 .8rem}
 .infpersona label{display:flex;align-items:center;gap:.6rem;font-weight:700;color:var(--suave);font-size:.85rem;text-transform:uppercase;letter-spacing:.04em}
 .infsel{flex:1;padding:.6rem .7rem;border:2px solid var(--azul2);border-radius:10px;background:var(--card);color:var(--txt);font-weight:700;font-size:1rem;text-transform:none;letter-spacing:0}
+@media (max-width:520px){.itot{grid-template-columns:1fr 1fr}}

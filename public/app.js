@@ -993,7 +993,6 @@ function vistaInformes() {
     const porCodigo = {};
     for (const r of propias) (porCodigo[r.codigo] = porCodigo[r.codigo] || []).push(r.fecha);
     const codigos = Object.keys(porCodigo).filter(c => !(S.cods[c] && S.cods[c].oculto)).sort((a, b) => (S.cods[a] ? S.cods[a].orden : 99) - (S.cods[b] ? S.cods[b].orden : 99));
-    const totAus = propias.filter(r => esAus(r.codigo)).length, totVac = propias.filter(r => esVac(r.codigo)).length;
     const tarjetas = GRUPOS.map(([g, titulo]) => {
       const cs = codigos.filter(c => grupoDe(c) === g); if (!cs.length) return null;
       return [h("h4", {}, titulo), cs.map(c => h("details", { class: "icod" },
@@ -1015,7 +1014,9 @@ function vistaInformes() {
       h("div", { class: "pag ancho" },
         h("h2", {}, S.infEmp === S.me.id ? "Mis días" : `Días de ${nombreEmp(S.infEmp)}`), esResp() ? null : h("p", { class: "sub" }, S.me.nombre),
         h("p", { class: "sub" }, "Solo cuentan los días ya pasados."),
-        h("div", { class: "itot" }, h("div", {}, h("b", {}, totAus), h("small", {}, "ausencias justificadas")), h("div", {}, h("b", {}, totVac), h("small", {}, "de vacaciones"))),
+        h("div", { class: "itot" }, [
+          [["CH", "CJ", "JS"], "CH · CJ · JS"], [["V1", "V2", "V3"], "Vacaciones"], [["AP"], "AP"], [["SS", "NAV"], "Semana Santa y Navidad"],
+        ].map(([cs, etq]) => h("div", {}, h("b", {}, propias.filter(r => cs.includes(r.codigo)).length), h("small", {}, etq)))),
         codigos.length ? tarjetas : h("p", { class: "det" }, "Todavía no hay días apuntados.")),
       h("div", { class: "pag ancho" },
         h("h2", {}, "Reparto de picos"), h("p", { class: "sub" }, "Picos ya hechos este año, de más a menos."),
