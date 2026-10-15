@@ -63,6 +63,9 @@ function diasRango(desde, hasta) {
   for (let f = desde; f <= hasta; f = nextDay(f)) o[f] = turnoCiclo(f);
   return o;
 }
+// Tercio = máximo de ausentes por vacaciones y permisos: la tercera parte de las personas activas, redondeando hacia abajo
+// (12 → 4, 11 → 3). Si el distrito aún no tiene a nadie, se usa el valor guardado.
+const tercioDe = (n, guardado) => n ? Math.floor(n / 3) : (guardado || 4);
 const ADMIN_KEY = "modoAdmin", DIST_KEY = "distritoAdmin";
 const leerLS = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const ponerLS = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} };
@@ -73,7 +76,7 @@ function ponerDistrito(d) {
   S.dist = Object.assign({ letra: "D", zona: 2 }, d);
   S.dist.turno = S.dist.letra + S.dist.zona;
   S.emps = (S.todos || []).filter(e => e.distrito_id === S.dist.id);
-  S.minimo = S.dist.minimo_operativo || 6; S.tercio = S.dist.tercio || 4;
+  S.minimo = S.dist.minimo_operativo || 6; S.tercio = tercioDe(S.emps.length, S.dist.tercio);
   const estoy = S.emps.some(e => e.id === S.me.id);
   S.infEmp = estoy ? S.me.id : (S.emps[0] || {}).id || 0;
   S.abiertas = new Set(estoy ? [S.me.id] : []);
@@ -961,14 +964,13 @@ function crearDistrito(letra, zona) {
   const dlg = h("dialog", { class: "seldist" });
   const nombre = h("input", { type: "text", placeholder: "Nombre del distrito", maxlength: "60" });
   const minimo = h("input", { type: "number", min: "1", max: "50", value: "6" });
-  const tercio = h("input", { type: "number", min: "1", max: "50", value: "4" });
   const err = h("div", { class: "error" });
   const crear = async ev => {
     const n = nombre.value.trim();
     if (!n) { err.textContent = "Escribe el nombre del distrito."; return; }
     const btn = ev.currentTarget; btn.disabled = true; err.textContent = "Creando…";
     const { data, error } = await sb.from("distritos")
-      .insert({ nombre: n, letra, zona, minimo_operativo: +minimo.value || 6, tercio: +tercio.value || 4 }).select().single();
+      .insert({ nombre: n, letra, zona, minimo_operativo: +minimo.value || 6 }).select().single();
     if (error) { btn.disabled = false; err.textContent = /duplicate|unique/i.test(error.message) ? "Ya existe un distrito con ese nombre en este turno." : "No se pudo crear: " + error.message; return; }
     await cargarDistritos(); dlg.close(); toast(`Distrito «${data.nombre}» creado en ${letra}${zona}`, 3000);
     cambiarDistrito(data);
@@ -976,7 +978,8 @@ function crearDistrito(letra, zona) {
   dlg.append(h("h3", {}, `Nuevo distrito en ${letra}${zona}`),
     h("div", { class: "nuevodist", style: "border:0;margin:0;padding:0" },
       h("label", {}, "Nombre", nombre),
-      h("div", { class: "dosnum" }, h("label", {}, "Mínimo de personas trabajando", minimo), h("label", {}, "Máximo de ausentes (tercio)", tercio))),
+      h("label", {}, "Mínimo de personas trabajando", minimo),
+      h("small", { class: "det" }, "El tercio (máximo de ausentes) se calcula solo: la tercera parte de las personas del distrito.")),
     err, h("div", { class: "fila" }, h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cancelar"), h("button", { class: "btn", onclick: crear }, "Crear distrito")));
   dlg.addEventListener("close", () => dlg.remove());
   document.body.append(dlg); dlg.showModal(); nombre.focus();
@@ -1001,6 +1004,7 @@ async function recargarEmpleados() {
   S.me = S.todos.find(x => x.id === S.me.id) || S.me;
   const sel = S.dist;
   S.emps = S.todos.filter(e => e.distrito_id === sel.id);
+  S.tercio = tercioDe(S.emps.length, sel.tercio);   // si alguien se da de baja o de alta, el tercio se recalcula
 }
 function abrirPersonas() {
   const dlg = h("dialog", { class: "seldist" });

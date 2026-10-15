@@ -183,7 +183,8 @@ async function tercioDelCambio(sb, cambios, emps, dist) {
   if (!fechas.length) return out;
   const { data: cd } = await sb.from("codigos").select("codigo,tipo");
   const cods = Object.fromEntries((cd || []).map((c) => [c.codigo, c]));
-  const tercio = dist.tercio || 4, misIds = emps.map((e) => e.id);
+  // Tercio: la tercera parte de las personas activas del distrito, redondeando hacia abajo (12 → 4, 11 → 3)
+  const tercio = emps.length ? Math.floor(emps.length / 3) : (dist.tercio || 4), misIds = emps.map((e) => e.id);
   const desde = masDias(fechas[0], -30), hasta = masDias(fechas[fechas.length - 1], 30);
   const filas = await leerTodo(() => sb.from("asignaciones").select("empleado_id,fecha,codigo").in("empleado_id", misIds).gte("fecha", desde).lte("fecha", hasta).order("fecha").order("empleado_id"));
   const asig = Object.fromEntries(filas.map((x) => [x.empleado_id + "|" + x.fecha, x.codigo]));
