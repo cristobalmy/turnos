@@ -28,9 +28,10 @@ function avisoPico(dist, f, emps, asig, cods, ultimo) {
   if (n % 2 === 0) return null;                                                // con número par no hace falta
   const porId = Object.fromEntries(emps.map((e) => [e.id, e]));
   const cand = emps.filter((e) => {
-    if (e.hace_pico === false || asig[e.id] || !e.pareja_id) return false;    // libre y que haga PICO
+    if (e.hace_pico === false || asig[e.id]) return false;                      // libre y que haga PICO
+    if (!e.pareja_id || !porId[e.pareja_id]) return true;                       // sin binomio (o de baja): siempre candidato
     const cp = asig[e.pareja_id];
-    return !!(porId[e.pareja_id] && cp && cods[cp] && !cods[cp].cuenta_como_trabajo);   // con su binomio ausente
+    return !!(cp && cods[cp] && !cods[cp].cuenta_como_trabajo);                 // con su binomio ausente
   }).map((e) => ({ e, u: ultimo[e.id] || "" }))
     .sort((a, b) => (a.u === b.u ? a.e.orden - b.e.orden : (a.u < b.u ? -1 : 1)));
   const p = f.split("-").map(Number), dia = DIA[new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay()];

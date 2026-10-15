@@ -73,11 +73,14 @@ const cP = { V1: { cuenta_como_trabajo: false }, AP: { cuenta_como_trabajo: fals
 const ep = [1, 2, 3, 4, 5, 6, 7].map(i => ({ id: i, nombre: "P" + i, orden: i, hace_pico: i !== 1, pareja_id: i % 2 ? i + 1 : i - 1 }));
 ep[6].pareja_id = null;
 // 20/10/2026: D hace noche. 7 personas trabajan → impar
-eq(avisoPico(dD, "2026-10-20", ep, {}, cP, {}), { title: "PICO mañana · Usera-Villaverde D2", body: "Mañana martes 20/10 (noche) trabajan 7: hace falta PICO. No hay ningún candidato libre con su binomio ausente." }, "pico: impar sin candidatos lo dice");
-eq(avisoPico(dD, "2026-10-20", ep, { 2: "V1" }, cP, {}), null, "pico: con número par no avisa");
-eq(avisoPico(dD, "2026-10-20", ep, { 3: "V1", 5: "AP" }, cP, { 4: "2026-09-01", 6: "2025-12-20" }).body, "Mañana martes 20/10 (noche) trabajan 5: hace falta PICO. Recomendado: P6 (luego P4)", "pico: recomienda a quien lleva más tiempo sin PICO, aunque fuera el año anterior");
-eq(avisoPico(dD, "2026-10-20", ep, { 3: "V1", 5: "AP" }, cP, { 6: "2026-09-01" }).body.endsWith("Recomendado: P4 (luego P6)"), true, "pico: quien nunca lo ha hecho va primero");
-eq(avisoPico(dD, "2026-10-20", ep, { 3: "V1", 5: "AP", 2: "V1", 4: "PICO" }, cP, {}), null, "pico: si ya está puesto no avisa");
-eq(avisoPico(dD, "2026-10-20", ep, { 2: "V1", 3: "V1", 7: "DESP" }, cP, {}).body.endsWith("trabajan 5: hace falta PICO. Recomendado: P4"), true, "pico: DESP cuenta como que trabaja, no como PICO; y quien no hace PICO no sale");
-eq(avisoPico(dD, "2026-10-22", ep, {}, cP, {}), null, "pico: día libre del ciclo no avisa");
+eq(avisoPico(dD, "2026-10-20", ep, {}, cP, {}), { title: "PICO mañana · Usera-Villaverde D2", body: "Mañana martes 20/10 (noche) trabajan 7: hace falta PICO. Recomendado: P7" }, "pico: quien no tiene binomio es candidato siempre que esté libre");
+const ep2 = ep.map(e => ({ ...e })); ep2[6].pareja_id = 6; ep2[5].pareja_id = 7;
+eq(avisoPico(dD, "2026-10-20", ep2, {}, cP, {}), { title: "PICO mañana · Usera-Villaverde D2", body: "Mañana martes 20/10 (noche) trabajan 7: hace falta PICO. No hay ningún candidato libre con su binomio ausente." }, "pico: impar sin candidatos lo dice");
+eq(avisoPico(dD, "2026-10-20", ep2.filter(e => e.id !== 7), { 1: "V1" }, cP, { 2: "2026-10-01" }).body.endsWith("Recomendado: P6 (luego P2)"), true, "pico: si su binomio está de baja (P7), es candidato");
+eq(avisoPico(dD, "2026-10-20", ep2, { 2: "V1" }, cP, {}), null, "pico: con número par no avisa");
+eq(avisoPico(dD, "2026-10-20", ep2, { 3: "V1", 5: "AP" }, cP, { 4: "2026-09-01", 6: "2025-12-20" }).body, "Mañana martes 20/10 (noche) trabajan 5: hace falta PICO. Recomendado: P6 (luego P4)", "pico: recomienda a quien lleva más tiempo sin PICO, aunque fuera el año anterior");
+eq(avisoPico(dD, "2026-10-20", ep2, { 3: "V1", 5: "AP" }, cP, { 6: "2026-09-01" }).body.endsWith("Recomendado: P4 (luego P6)"), true, "pico: quien nunca lo ha hecho va primero");
+eq(avisoPico(dD, "2026-10-20", ep2, { 3: "V1", 5: "AP", 2: "V1", 4: "PICO" }, cP, {}), null, "pico: si ya está puesto no avisa");
+eq(avisoPico(dD, "2026-10-20", ep2, { 2: "V1", 3: "V1", 7: "DESP" }, cP, {}).body.endsWith("trabajan 5: hace falta PICO. Recomendado: P4"), true, "pico: DESP cuenta como que trabaja, no como PICO; y quien no hace PICO no sale");
+eq(avisoPico(dD, "2026-10-22", ep2, {}, cP, {}), null, "pico: día libre del ciclo no avisa");
 process.exit(fallos ? 1 : 0);

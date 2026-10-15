@@ -263,11 +263,12 @@ function recomendarPico(f, A = S.asig) {
   return cand;
 }
 function candidatosPico(f, A = S.asig) {
-  // libre (sin código) y su pareja ausente
+  // libre (sin código) y su binomio ausente. Quien no tiene binomio (o lo tiene de baja, p. ej. destinado
+  // temporalmente en otro equipo) es candidato siempre que esté libre.
   return S.emps.filter(e => {
     if (e.hace_pico === false) return false;
     if (A[e.id + "|" + f]) return false;
-    if (!e.pareja_id) return false;
+    if (!e.pareja_id || !S.emps.some(x => x.id === e.pareja_id)) return true;
     const cp = A[e.pareja_id + "|" + f];
     return cp && S.cods[cp] && !S.cods[cp].cuenta_como_trabajo;
   });
