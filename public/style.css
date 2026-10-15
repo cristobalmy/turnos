@@ -384,6 +384,6 @@ dialog .dcab .btn{white-space:nowrap;flex:none}
 :root[data-tema=oscuro] .md.s-T,:root[data-tema=oscuro] .anioleyenda .s-T::before{background:#4a3520}
 :root[data-tema=oscuro] .md.s-N,:root[data-tema=oscuro] .anioleyenda .s-N::before{background:#2b2f55}
 @media (max-width:700px){.anio12{grid-template-columns:1fr 1fr;gap:.5rem}.md{min-height:26px;font-size:.66rem}.mmes{padding:.3rem}}
-.infpersona{max-width:1100px;margin:.8rem auto 0;padding:0 .8rem}
+.infpersona{max-width:640px;margin:.2rem auto 0;padding:0 .8rem}
 .infpersona label{display:flex;align-items:center;gap:.6rem;font-weight:700;color:var(--suave);font-size:.85rem;text-transform:uppercase;letter-spacing:.04em}
 .infsel{flex:1;padding:.6rem .7rem;border:2px solid var(--azul2);border-radius:10px;background:var(--card);color:var(--txt);font-weight:700;font-size:1rem;text-transform:none;letter-spacing:0}
