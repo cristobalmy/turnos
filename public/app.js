@@ -1006,10 +1006,10 @@ function vistaInformes() {
       return { e, n: mios.length, d: des.length, ult: mios.length ? mios[mios.length - 1].fecha : "" };
     }).sort((a, b) => b.n - a.n || a.e.orden - b.e.orden);
     cont.replaceChildren(
+      esResp() ? h("div", { class: "infpersona" }, h("label", {}, "Persona", sel)) : null,
       h("div", { class: "mes" },
         h("button", { disabled: S.infY <= S.anioMin, onclick: async () => { S.infY--; await cargarAnio(S.infY); dibujar(); } }, "‹"), h("b", {}, S.infY),
-        h("button", { disabled: S.infY >= S.anioMax, onclick: async () => { S.infY++; await cargarAnio(S.infY); dibujar(); } }, "›"),
-        esResp() ? h("div", { class: "mesacc" }, sel) : null),
+        h("button", { disabled: S.infY >= S.anioMax, onclick: async () => { S.infY++; await cargarAnio(S.infY); dibujar(); } }, "›")),
       h("div", { class: "pag anchoanio" },
         h("h2", {}, S.infEmp === S.me.id ? "Mi año" : `Año de ${nombreEmp(S.infEmp)}`), bloqueMiAnio(S.infEmp, S.infY)),
       h("div", { class: "pag ancho" },
