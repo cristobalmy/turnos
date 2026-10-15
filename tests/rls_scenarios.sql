@@ -220,3 +220,13 @@ select pg_temp.chk((select espera from net.llamadas where body->>'hecho_por' = '
 select pg_temp.chk((select headers->>'x-aviso-secret' from net.llamadas where body->>'hecho_por' = '4' limit 1) = 'secreto-de-prueba', 'y conserva el secreto');
 select pg_temp.chk((select command like '%timeout_milliseconds := 30000%' and command like '%secreto-de-prueba%' from cron.job where jobname = 'aviso-pico'), 'el aviso del PICO también espera 30 segundos');
 rollback;
+
+\echo == Migración 019: fuera temporalmente
+select pg_temp.chk((select count(*) from empleados where fuera) = 0, 'al principio nadie está fuera');
+begin; set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
+select pg_temp.chk(pg_temp.filas($$update empleados set fuera = true where nombre = 'Gustavo'$$) = 0, 'un agente no puede marcarse fuera');
+select set_config('request.jwt.claims','{"email":"nacho@t.es"}',true);
+select pg_temp.chk(pg_temp.filas($$update empleados set fuera = true where nombre = 'Gustavo'$$) = 1, 'un responsable sí puede marcar a alguien de su distrito');
+select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
+select pg_temp.chk((select count(*) from asignaciones) = 985, 'quien está fuera sigue pudiendo entrar y ver el calendario');
+rollback;

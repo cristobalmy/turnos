@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
   const sb = createClient(Deno.env.get("SUPABASE_URL"), Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
   const [{ data: ds }, { data: emps }, { data: cd }, { data: filas }, { data: picos }, { data: subs }] = await Promise.all([
     sb.from("distritos").select("*"),
-    sb.from("empleados").select("id,nombre,orden,rol,admin,activo,hace_pico,pareja_id,distrito_id").eq("activo", true),
+    sb.from("empleados").select("*").eq("activo", true),
     sb.from("codigos").select("codigo,cuenta_como_trabajo"),
     sb.from("asignaciones").select("empleado_id,codigo").eq("fecha", manana),
     sb.from("asignaciones").select("empleado_id,fecha").eq("codigo", "PICO").lt("fecha", manana).order("fecha", { ascending: false }).limit(5000),
@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
   webpush.setVapidDetails(Deno.env.get("VAPID_SUBJECT"), Deno.env.get("VAPID_PUBLIC_KEY"), Deno.env.get("VAPID_PRIVATE_KEY"));
   const informe = [];
   for (const dist of ds || []) {
-    const suyos = (emps || []).filter((e) => e.distrito_id === dist.id).sort((a, b) => a.orden - b.orden);
+    const suyos = (emps || []).filter((e) => e.distrito_id === dist.id && !e.fuera).sort((a, b) => a.orden - b.orden);   // "fuera temporalmente" no cuenta
     const aviso = avisoPico(dist, manana, suyos, asig, cods, ultimo);
     if (!aviso) { informe.push(dist.nombre + ": sin aviso"); continue; }
     // A los responsables del distrito (en prueba, solo al administrador)

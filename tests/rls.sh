@@ -37,6 +37,8 @@ sed -e '/create extension/d' supabase/migracion_017_aviso_pico.sql | $P >/dev/nu
 sed -e '/create extension/d' supabase/migracion_017_aviso_pico.sql | $P >/dev/null   # repetirla no debe dar error
 $P -f supabase/migracion_018_avisos_espera.sql >/dev/null
 $P -f supabase/migracion_018_avisos_espera.sql >/dev/null   # repetirla no debe dar error
+$P -f supabase/migracion_019_fuera_temporal.sql >/dev/null
+$P -f supabase/migracion_019_fuera_temporal.sql >/dev/null   # repetirla no debe dar error
 $P -f tests/after_schema.sql
 $P -f tests/rls_scenarios.sql 2>&1 | grep -E "^(==|NOTICE|psql|ERROR)" | sed 's/^NOTICE:  //' | tee /tmp/rls_out.txt
 $P -f tests/stub_net_respuestas.sql >/dev/null

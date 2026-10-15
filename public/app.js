@@ -75,7 +75,7 @@ const miDistrito = () => (S.distritos || []).find(d => d.id === S.me.distrito_id
 function ponerDistrito(d) {
   S.dist = Object.assign({ letra: "D", zona: 2 }, d);
   S.dist.turno = S.dist.letra + S.dist.zona;
-  S.emps = (S.todos || []).filter(e => e.distrito_id === S.dist.id);
+  S.emps = (S.todos || []).filter(e => e.distrito_id === S.dist.id && !e.fuera);   // "fuera temporalmente" no cuenta
   S.minimo = S.dist.minimo_operativo || 6; S.tercio = tercioDe(S.emps.length, S.dist.tercio);
   const estoy = S.emps.some(e => e.id === S.me.id);
   S.infEmp = estoy ? S.me.id : (S.emps[0] || {}).id || 0;
@@ -946,6 +946,37 @@ function bloqueAvisos() {
   return caja;
 }
 
+// ---------- mi año: los 12 meses de una persona de un vistazo ----------
+function bloqueMiAnio(empId, y) {
+  const cod = {};
+  for (const r of S.infAnio[y] || []) if (r.empleado_id === empId) cod[r.fecha] = r.codigo;
+  const hoy = hoyStr();
+  const irA = (m, f) => { S.y = y; S.m = m; S.sel = f; S.vista = "cal"; S.yaScroll = false; cargarMes().then(pintar); };
+  const meses = MESES.map((nombre, m) => {
+    const nd = new Date(y, m + 1, 0).getDate(), hueco = (new Date(y, m, 1).getDay() + 6) % 7;
+    const celdas = [];
+    for (let i = 0; i < hueco; i++) celdas.push(h("span", { class: "md0" }));
+    let nv = 0, np = 0;
+    for (let d = 1; d <= nd; d++) {
+      const f = fechaStr(y, m, d), t = turnoCiclo(f), c = cod[f];
+      if (c && esVac(c)) nv++; else if (c && esAus(c)) np++;
+      const cls = "md " + (c ? "c-" + grupoDe(c) : ["M", "T", "N"].includes(t) ? "s-" + t : "lib") + (f === hoy ? " hoy" : "");
+      celdas.push(h("button", { class: cls, title: `${fechaSem(f)} · ${TURNO_NOMBRE[t] || "Libre"}${c ? " · " + c + (S.cods[c] && S.cods[c].descripcion ? " (" + S.cods[c].descripcion + ")" : "") : ""}`, onclick: () => irA(m, f) },
+        h("span", {}, d), c ? h("i", {}, c) : null));
+    }
+    return h("div", { class: "mmes" },
+      h("div", { class: "mtit2" }, nombre[0].toUpperCase() + nombre.slice(1),
+        nv || np ? h("small", {}, [nv ? `${nv} vac` : null, np ? `${np} perm` : null].filter(Boolean).join(" · ")) : null),
+      h("div", { class: "mgrid" }, ["L", "M", "X", "J", "V", "S", "D"].map(x => h("span", { class: "mds" }, x)), celdas));
+  });
+  return h("div", {},
+    h("div", { class: "anioleyenda" },
+      h("span", { class: "s-M" }, "Mañana"), h("span", { class: "s-T" }, "Tarde"), h("span", { class: "s-N" }, "Noche"),
+      h("span", { class: "c-a" }, "Vacaciones y permisos"), h("span", { class: "c-t" }, "Trabajo"), h("span", { class: "c-m" }, "PICO/DESP"), h("span", { class: "c-e" }, "Otros")),
+    h("div", { class: "anio12" }, meses),
+    h("small", { class: "det" }, "Toca un día para abrirlo en el calendario."));
+}
+
 // ---------- informes ----------
 S.infY = 0; S.infEmp = 0;
 function vistaInformes() {
@@ -978,8 +1009,11 @@ function vistaInformes() {
       h("div", { class: "mes" },
         h("button", { disabled: S.infY <= S.anioMin, onclick: async () => { S.infY--; await cargarAnio(S.infY); dibujar(); } }, "‹"), h("b", {}, S.infY),
         h("button", { disabled: S.infY >= S.anioMax, onclick: async () => { S.infY++; await cargarAnio(S.infY); dibujar(); } }, "›")),
+      h("div", { class: "pag anchoanio" },
+        h("h2", {}, S.infEmp === S.me.id ? "Mi año" : `Año de ${nombreEmp(S.infEmp)}`), esResp() ? sel : null,
+        bloqueMiAnio(S.infEmp, S.infY)),
       h("div", { class: "pag ancho" },
-        h("h2", {}, "Mis días"), esResp() ? sel : h("p", { class: "sub" }, S.me.nombre),
+        h("h2", {}, S.infEmp === S.me.id ? "Mis días" : `Días de ${nombreEmp(S.infEmp)}`), esResp() ? null : h("p", { class: "sub" }, S.me.nombre),
         h("p", { class: "sub" }, "Solo cuentan los días ya pasados."),
         h("div", { class: "itot" }, h("div", {}, h("b", {}, totAus), h("small", {}, "ausencias justificadas")), h("div", {}, h("b", {}, totVac), h("small", {}, "de vacaciones"))),
         codigos.length ? tarjetas : h("p", { class: "det" }, "Todavía no hay días apuntados.")),
@@ -1084,7 +1118,7 @@ async function recargarEmpleados() {
   S.fichas = data; S.todos = data.filter(x => x.activo);
   S.me = S.todos.find(x => x.id === S.me.id) || S.me;
   const sel = S.dist;
-  S.emps = S.todos.filter(e => e.distrito_id === sel.id);
+  S.emps = S.todos.filter(e => e.distrito_id === sel.id && !e.fuera);
   S.tercio = tercioDe(S.emps.length, sel.tercio);   // si alguien se da de baja o de alta, el tercio se recalcula
 }
 function abrirPersonas() {
@@ -1093,7 +1127,7 @@ function abrirPersonas() {
   const ROL = { responsable: "Responsable", agente: "Agente" };
   const dibujar = () => {
     const del = (S.fichas || []).filter(e => e.distrito_id === S.dist.id);
-    const activas = del.filter(e => e.activo), bajas = del.filter(e => !e.activo);
+    const activas = del.filter(e => e.activo && !e.fuera), fuera = del.filter(e => e.activo && e.fuera), bajas = del.filter(e => !e.activo);
     const cambiarRol = async (e, btn) => {
       const nuevo = e.rol === "responsable" ? "agente" : "responsable";
       if (e.id === S.me.id && nuevo === "agente") { toast("No puedes quitarte a ti mismo de responsable.", 3500); return; }
@@ -1112,6 +1146,16 @@ function abrirPersonas() {
       h("p", { class: "sub" }, `${activas.length} persona${activas.length === 1 ? "" : "s"} en ${S.dist.nombre} (${S.dist.turno}). Pulsa en alguien para cambiar sus datos, darle de baja o borrarlo.`),
       h("button", { class: "btn full", onclick: () => editarPersona(null, dibujar) }, "+ Dar de alta a una persona"),
       h("div", { class: "distlista" }, activas.map(fila)),
+      fuera.length ? [h("h4", {}, "Fuera temporalmente"), h("p", { class: "sub" }, "Pueden entrar y ver el calendario, pero no salen en él, no cuentan en el tercio ni en el PICO."),
+        h("div", { class: "distlista" }, fuera.map(e => h("div", { class: "persona fuera" },
+          h("button", { class: "pcol", onclick: () => editarPersona(e, dibujar) }, h("b", {}, e.nombre), h("small", {}, e.pareja_id ? "binomio: " + nombreEmp(e.pareja_id) : "sin binomio")),
+          h("button", { class: "btn mini", onclick: async ev => {
+            if (!confirm(`¿${e.nombre} vuelve al equipo? Volverá a salir en el calendario y a contar en el tercio y el PICO.`)) return;
+            ev.currentTarget.disabled = true;
+            const { error } = await sb.from("empleados").update({ fuera: false }).eq("id", e.id);
+            if (error) { ev.currentTarget.disabled = false; toast("No se pudo: " + error.message, 6000); return; }
+            await recargarEmpleados(); dibujar(); pintar(); toast(`${e.nombre} vuelve al equipo`, 3000);
+          } }, "Vuelve al equipo"))))] : null,
       bajas.length ? [h("h4", {}, "De baja"), h("div", { class: "distlista" }, bajas.map(e => h("button", { class: "btn sec full persona baja", onclick: async ev => {
         if (!confirm(`¿Volver a dar de alta a ${e.nombre}? Podrá entrar otra vez con su correo y su contraseña.`)) return;
         ev.currentTarget.disabled = true;
@@ -1147,6 +1191,7 @@ function editarPersona(emp, alVolver) {
   const clave = h("input", { type: "text", value: claveProvisional(), autocomplete: "off" });
   const rol = h("select", {}, [["agente", "Agente"], ["responsable", "Responsable"]].map(([v, t]) => h("option", { value: v, selected: emp ? emp.rol === v : v === "agente" }, t)));
   const pico = h("input", { type: "checkbox", checked: emp ? emp.hace_pico !== false : true });
+  const fueraChk = h("input", { type: "checkbox", checked: !!(emp && emp.fuera) });
   const otros = S.todos.filter(e => e.distrito_id === S.dist.id && (!emp || e.id !== emp.id));
   const pareja = h("select", {}, h("option", { value: "" }, "— Sin binomio —"), otros.map(e => h("option", { value: e.id, selected: emp && emp.pareja_id === e.id }, e.nombre)));
   const err = h("div", { class: "error" });
@@ -1162,7 +1207,10 @@ function editarPersona(emp, alVolver) {
       if (msg || !data) { btn.disabled = false; err.textContent = msg || "No se pudo dar de alta."; return; }
       id = data.empleado.id; cuentaNueva = data.cuentaNueva;
     } else {
-      const { error } = await sb.from("empleados").update({ nombre: n, rol: rol.value, hace_pico: pico.checked }).eq("id", id);
+      const cambios = { nombre: n, rol: rol.value, hace_pico: pico.checked };
+      if (fueraChk.checked !== !!emp.fuera) cambios.fuera = fueraChk.checked;
+      const { error } = await sb.from("empleados").update(cambios).eq("id", id);
+      if (error && /fuera/.test(error.message)) { btn.disabled = false; err.textContent = "Falta ejecutar en Supabase la migración 019 (fuera temporalmente)."; return; }
       if (error) { btn.disabled = false; err.textContent = /duplicate|unique/i.test(error.message) ? "Ya hay alguien con ese nombre en este distrito." : "No se pudo guardar: " + error.message; return; }
     }
     await recargarEmpleados();
@@ -1209,7 +1257,9 @@ function editarPersona(emp, alVolver) {
         h("small", { class: "det" }, "Se la das tú. La primera vez que entre, la app le pedirá que elija la suya.")] : h("small", { class: "det" }, emp.email || ""),
       h("label", {}, "Papel", rol),
       h("label", {}, "Binomio", pareja),
-      h("label", { class: "check" }, pico, " Hace PICO")),
+      h("label", { class: "check" }, pico, " Hace PICO"),
+      !nueva && emp.id !== S.me.id ? [h("label", { class: "check" }, fueraChk, " Fuera temporalmente (en otro equipo)"),
+        h("small", { class: "det" }, "Sigue pudiendo entrar y ver el calendario, pero no sale en él ni cuenta en el tercio ni en el PICO. Su binomio queda como «sin binomio» mientras tanto.")] : null),
     err,
     emp ? h("div", { class: "fila peligros" }, baja, borrar) : null,
     h("div", { class: "fila" }, h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cancelar"),
@@ -1253,12 +1303,12 @@ function hojaXml(nombre, filas) {
 async function descargarCopia(btn, msg) {
   btn.disabled = true; msg.textContent = "Preparando la copia…";
   try {
-    const t = [["Calendario", "dias", "fecha"], ["Asignaciones", "asignaciones", "fecha"], ["Empleados", "empleados", "orden"], ["Codigos", "codigos", "orden"],
+    const t = [["Calendario", "dias", "fecha"], ["Asignaciones", "asignaciones", "fecha"], ["Empleados", "empleados", "orden"], ["Codigos", "codigos", "orden"], ["Distritos", "distritos", "id"],
       ["Formaciones", "formaciones", "id"], ["Cursos", "cursos", "orden"], ["Cambios", "cambios", "creado_en"]];
     const hojas = [];
     for (const [n, tabla, ord] of t) hojas.push(hojaXml(n, await leerTodo(tabla, ord)));
     const xml = `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">${hojas.join("")}</Workbook>`;
-    const a = h("a", { href: URL.createObjectURL(new Blob([xml], { type: "application/xml" })), download: `copia-turno-d-${hoyStr()}.xml` });
+    const a = h("a", { href: URL.createObjectURL(new Blob([xml], { type: "application/xml" })), download: `copia-tercio-${hoyStr()}.xml` });
     document.body.append(a); a.click(); a.remove();
     msg.textContent = "Copia descargada ✔ (ábrela con Excel)";
   } catch (e) { msg.textContent = "No se pudo hacer la copia: " + (e.message || e); }

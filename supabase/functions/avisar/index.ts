@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
   if (error) return new Response(error.message, { status: 500 });
   if (!cambios || !cambios.length) return new Response("nada que avisar");
 
-  const { data: emps } = await sb.from("empleados").select("id,nombre,orden,rol,admin,activo,distrito_id");
+  const { data: emps } = await sb.from("empleados").select("*");
   const nombre = Object.fromEntries((emps || []).map((e) => [e.id, e.nombre]));
   const distritoDe = Object.fromEntries((emps || []).map((e) => [e.id, e.distrito_id]));
   const { data: ds } = await sb.from("distritos").select("*");
@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
   const informe = [];
   for (const [did, lista] of porDistrito) {
     const dist = distritos[did] || { nombre: "Tercio", letra: "D", turno: "", tercio: 4 };
-    const suyos = (emps || []).filter((e) => e.distrito_id === did && e.activo !== false);
+    const suyos = (emps || []).filter((e) => e.distrito_id === did && e.activo !== false && !e.fuera);   // "fuera temporalmente" no cuenta
     const resp = new Set(suyos.filter((e) => e.rol === "responsable" || e.admin).map((e) => e.id));
     const ids = new Set(suyos.map((e) => e.id));
     const subs = (todasSubs || []).filter((s) => ids.has(s.empleado_id));
