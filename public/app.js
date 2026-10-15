@@ -1002,8 +1002,9 @@ function vistaInformes() {
     // reparto de picos
     const picosEmp = S.emps.filter(e => e.hace_pico !== false).map(e => {
       const mios = rows.filter(r => r.empleado_id === e.id && r.codigo === "PICO"), des = rows.filter(r => r.empleado_id === e.id && r.codigo === "DESP");
-      return { e, n: mios.length, d: des.length, ult: mios.length ? mios[mios.length - 1].fecha : "" };
-    }).sort((a, b) => b.n - a.n || a.e.orden - b.e.orden);
+      // último pico de cualquier año (la rotación sigue de un año a otro)
+      return { e, n: mios.length, d: des.length, ult: ultimoPico(e.id, hoy) };
+    }).sort((a, b) => (b.ult || "").localeCompare(a.ult || "") || a.e.orden - b.e.orden);   // primero quien lo hizo más recientemente; al final quien lleva más sin hacerlo
     cont.replaceChildren(
       h("div", { class: "mes" },
         h("button", { disabled: S.infY <= S.anioMin, onclick: async () => { S.infY--; await cargarAnio(S.infY); dibujar(); } }, "‹"), h("b", {}, S.infY),
@@ -1019,7 +1020,7 @@ function vistaInformes() {
         ].map(([cs, etq]) => h("div", {}, h("b", {}, propias.filter(r => cs.includes(r.codigo)).length), h("small", {}, etq)))),
         codigos.length ? tarjetas : h("p", { class: "det" }, "Todavía no hay días apuntados.")),
       h("div", { class: "pag ancho" },
-        h("h2", {}, "Reparto de picos"), h("p", { class: "sub" }, "Picos ya hechos este año, de más a menos."),
+        h("h2", {}, "Reparto de picos"), h("p", { class: "sub" }, "Ordenado por el último pico: arriba quien lo hizo más recientemente; abajo quien más tiempo lleva sin hacerlo (le tocaría antes)."),
         h("table", { class: "ipicos" }, h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Picos"), h("th", {}, "Desplazado"), h("th", {}, "Último pico"))),
           h("tbody", {}, picosEmp.map(x => h("tr", {}, h("td", {}, x.e.nombre), h("td", {}, h("b", {}, x.n)), h("td", {}, x.d), h("td", {}, x.ult ? fechaLarga(x.ult) : "–"))))),
         null));
