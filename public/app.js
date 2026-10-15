@@ -1010,8 +1010,6 @@ function vistaInformes() {
         h("button", { disabled: S.infY <= S.anioMin, onclick: async () => { S.infY--; await cargarAnio(S.infY); dibujar(); } }, "‹"), h("b", {}, S.infY),
         h("button", { disabled: S.infY >= S.anioMax, onclick: async () => { S.infY++; await cargarAnio(S.infY); dibujar(); } }, "›")),
       esResp() ? h("div", { class: "infpersona" }, h("label", {}, "Persona", sel)) : null,
-      h("div", { class: "pag anchoanio" },
-        h("h2", {}, S.infEmp === S.me.id ? "Mi año" : `Año de ${nombreEmp(S.infEmp)}`), bloqueMiAnio(S.infEmp, S.infY)),
       h("div", { class: "pag ancho" },
         h("h2", {}, S.infEmp === S.me.id ? "Mis días" : `Días de ${nombreEmp(S.infEmp)}`), esResp() ? null : h("p", { class: "sub" }, S.me.nombre),
         h("p", { class: "sub" }, "Solo cuentan los días ya pasados."),
@@ -1023,7 +1021,12 @@ function vistaInformes() {
         h("h2", {}, "Reparto de picos"), h("p", { class: "sub" }, "Ordenado por el último pico: arriba quien lo hizo más recientemente; abajo quien más tiempo lleva sin hacerlo (le tocaría antes)."),
         h("table", { class: "ipicos" }, h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Picos"), h("th", {}, "Desplazado"), h("th", {}, "Último pico"))),
           h("tbody", {}, picosEmp.map(x => h("tr", {}, h("td", {}, x.e.nombre), h("td", {}, h("b", {}, x.n)), h("td", {}, x.d), h("td", {}, x.ult ? fechaLarga(x.ult) : "–"))))),
-        null));
+        null),
+      // «Mi año» al final y plegado (en el móvil ocupa mucho); se recuerda si lo dejaste abierto
+      h("div", { class: "pag anchoanio" },
+        h("details", { class: "anioplegable", open: !!S.anioAbierto, ontoggle: ev => { S.anioAbierto = ev.target.open; } },
+          h("summary", {}, h("span", {}, S.infEmp === S.me.id ? "Mi año" : `Año de ${nombreEmp(S.infEmp)}`), h("small", {}, "los 12 meses")),
+          bloqueMiAnio(S.infEmp, S.infY))));
   };
   dibujar();
   cargarAnio(S.infY).then(dibujar);   // refresca al entrar
