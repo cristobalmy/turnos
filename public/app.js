@@ -574,7 +574,7 @@ function vistaCalendario() {
     h("th", { class: "nom", title: "Resaltar su fila", onclick: () => { S.fsel = S.fsel === e.id ? null : e.id; pintar(); } }, e.nombre),
     dias.map(d => {
       const f = fechaStr(S.y, S.m, d), c = S.asig[e.id + "|" + f], t = S.dias[f];
-      return h("td", { class: "dia " + cls(d, f) + (t === "S" || t === "L" ? " libre" : "") + (esPasado(f) && !S.me.admin ? " pasado" : "") + (e.id === S.me.id && S.notas[f] ? " nota" : ""), title: e.id === S.me.id && S.notas[f] ? S.notas[f] : null, onclick: () => { S.sel = f; abrirEdicion(e, f); } },
+      return h("td", { class: "dia " + cls(d, f) + (S.rango && S.rango.emp.id === e.id && S.rango.desde === f ? " rinicio" : "") + (t === "S" || t === "L" ? " libre" : "") + (esPasado(f) && !S.me.admin ? " pasado" : "") + (e.id === S.me.id && S.notas[f] ? " nota" : ""), title: e.id === S.me.id && S.notas[f] ? S.notas[f] : null, onclick: () => tocarDia(e, f) },
         c ? h("span", { class: "cod " + claseTipo(c) }, c) : "");
     }))));
   const filaTercio = h("tr", {}, h("th", { class: "nom", title: "Ausentes por vacaciones o permisos" }, `Tercio (máx. ${S.tercio})`), dias.map(d => {
@@ -598,7 +598,10 @@ function vistaCalendario() {
     h("div", { class: "resumen" }, resumenDia()),
     bloquePico(),
     h("div", { style: "height:.7rem" }),
-    h("div", { class: "wrap" }, h("table", { class: "cal" + (S.fsel ? " conSel" : "") }, thead, tbody, tfoot)),
+    S.rango ? h("div", { class: "rangoaviso" },
+      h("span", {}, "Varios días para ", h("b", {}, S.rango.emp.nombre), ` desde el ${fechaSem(S.rango.desde)}. Toca el último día en su fila.`),
+      h("button", { class: "btn sec mini", onclick: () => { S.rango = null; pintar(); } }, "Cancelar")) : null,
+    h("div", { class: "wrap" }, h("table", { class: "cal" + (S.fsel ? " conSel" : "") + (S.rango ? " enRango" : "") }, thead, tbody, tfoot)),
     bloqueQuitar(),
     h("div", { class: "leyenda" }, h("span", { class: "a" }, "Vacaciones y permisos"), h("span", { class: "t" }, "Trabajo"), h("span", { class: "m" }, "Modificadores (PICO, DESP)"), h("span", { class: "e" }, "Otros"), h("span", { class: "l" }, "Día libre (L)"),
       h("span", {}, (esResp() ? "Toca una casilla para poner o quitar un código. " : "Toca una casilla tuya para poner o quitar un código. ") + "Toca un nombre para resaltar su fila y un día arriba para ver su resumen.")));
@@ -663,7 +666,34 @@ function bloqueNota(f) {
   return h("div", { class: "nota-bloque" }, h("h4", {}, "Nota del día"), ta, h("div", { class: "fila" }, h("button", { class: "btn sec mini", onclick: guardarNota }, "Guardar nota"), msg));
 }
 
-function abrirEdicion(emp, f) {
+const fechaSem = f => { const [y, m, d] = f.split("-").map(Number); return `${DSEM3[new Date(y, m - 1, d).getDay()]} ${d}/${m}`; };
+const DSEM3 = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+// Toque en una casilla: normal (un día) o, si se está eligiendo un rango, el último día.
+function tocarDia(e, f) {
+  if (!S.rango) { S.sel = f; abrirEdicion(e, f); return; }
+  if (e.id !== S.rango.emp.id) { toast(`Toca un día de la fila de ${S.rango.emp.nombre}, o pulsa Cancelar arriba`, 3500); return; }
+  const a = S.rango.desde < f ? S.rango.desde : f, b = S.rango.desde < f ? f : S.rango.desde;
+  S.rango = null; S.sel = b;
+  if (a === b) { abrirEdicion(e, a); return; }
+  abrirEdicion(e, a, b);
+}
+// Desplegables de códigos: un apartado por grupo; se abre el del código actual y, al abrir uno, se cierran los demás.
+function seccionesCodigos(emp, actual, elegir) {
+  const lista = GRUPOS.map(([tipo, titulo]) => {
+    const cs = Object.values(S.cods).filter(c => !c.oculto && grupoDe(c.codigo) === tipo && (esResp() || !c.solo_responsables) && !(c.codigo === "PICO" && emp.hace_pico === false));
+    if (!cs.length) return null;
+    const det = h("details", { class: "grupo g-" + tipo, open: cs.some(c => c.codigo === actual) },
+      h("summary", {}, h("span", { class: "gpunto" }), titulo, h("small", {}, String(cs.length))),
+      h("div", { class: "chips" }, cs.map(c =>
+        h("button", { class: `chip ${claseTipo(c.codigo)} ${c.codigo === actual ? "act" : ""}`, onclick: ev => elegir(c.codigo, ev.currentTarget) },
+          h("b", {}, c.codigo), h("span", {}, c.descripcion)))));
+    return det;
+  }).filter(Boolean);
+  lista.forEach(d => d.addEventListener("toggle", () => { if (d.open) lista.forEach(o => { if (o !== d) o.open = false; }); }));
+  return lista;
+}
+function abrirEdicion(emp, f, hasta) {
+  if (hasta) return abrirEdicionRango(emp, f, hasta);
   if (esPasado(f) && !S.me.admin) { avisoDiaBloqueado(f); return; }
   const puede = esResp() || emp.id === S.me.id;
   const actual = S.asig[emp.id + "|" + f] || "";
@@ -673,22 +703,73 @@ function abrirEdicion(emp, f) {
   const dlg = h("dialog", {});
   const [y, m, d] = f.split("-").map(Number);
   const elegir = async (codigo, btn) => { btn.disabled = true; await guardar(emp, f, codigo); dlg.close(); };
-  const secciones = GRUPOS.map(([tipo, titulo]) => {
-    const lista = Object.values(S.cods).filter(c => !c.oculto && grupoDe(c.codigo) === tipo && (esResp() || !c.solo_responsables) && !(c.codigo === "PICO" && emp.hace_pico === false));
-    if (!lista.length) return null;
-    return [h("h4", {}, titulo), h("div", { class: "chips" }, lista.map(c =>
-      h("button", { class: `chip ${claseTipo(c.codigo)} ${c.codigo === actual ? "act" : ""}`, onclick: ev => elegir(c.codigo, ev.currentTarget) },
-        h("b", {}, c.codigo), h("span", {}, c.descripcion))))];
-  });
   const cand = esResp() && !actual && ["M", "T", "N"].includes(S.dias[f]) && hacePicoFalta(f) ? candidatosPico(f) : [];
   dlg.append(...[
-    h("h3", {}, emp.nombre), h("p", { class: "sub" }, `${DLARGO[new Date(y, m - 1, d).getDay()]} ${d}/${m}/${y} · turno ${TURNO_NOMBRE[S.dias[f]] ? TURNO_NOMBRE[S.dias[f]].toLowerCase() : "?"}`),
+    h("div", { class: "dcab" },
+      h("div", {}, h("h3", {}, emp.nombre), h("p", { class: "sub" }, `${DLARGO[new Date(y, m - 1, d).getDay()]} ${d}/${m}/${y} · turno ${TURNO_NOMBRE[S.dias[f]] ? TURNO_NOMBRE[S.dias[f]].toLowerCase() : "?"}`)),
+      h("button", { class: "btn sec mini", title: "Elegir hasta qué día", onclick: () => { S.rango = { emp, desde: f }; dlg.close(); toast(`Ahora toca el último día en la fila de ${emp.nombre}`, 3000); } }, "Varios días")),
     cand.length ? h("div", { class: "cand" }, "Candidatos a PICO (libres con su binomio ausente): " + cand.map(c => c.nombre).join(", ")) : null,
-    h("div", { class: "contenido" }, secciones),
+    h("div", { class: "contenido" }, seccionesCodigos(emp, actual, elegir)),
     emp.id === S.me.id ? bloqueNota(f) : null,
     h("div", { class: "fila" },
       h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cerrar"),
       actual ? h("button", { class: "btn sec", onclick: ev => elegir("", ev.currentTarget) }, "Quitar código") : null)].filter(Boolean));
+  dlg.addEventListener("close", () => { dlg.remove(); pintar(); });
+  document.body.append(dlg); dlg.showModal();
+}
+// Varios días: solo los días de servicio del rango; se saltan los libres, los pasados (salvo administrador)
+// y, para quien no es responsable, los que tienen un código que solo ponen los responsables.
+function abrirEdicionRango(emp, desde, hasta) {
+  if (!(esResp() || emp.id === S.me.id)) { toast(`Solo ${emp.nombre} o un responsable pueden cambiar sus días`, 2500); return; }
+  const todos = [];
+  for (let f = desde; f <= hasta && todos.length < 120; f = nextDay(f)) todos.push(f);
+  const servicio = todos.filter(f => ["M", "T", "N"].includes(turnoCiclo(f)));
+  const pasados = servicio.filter(f => esPasado(f) && !S.me.admin);
+  const reservados = servicio.filter(f => !esResp() && S.asig[emp.id + "|" + f] && S.cods[S.asig[emp.id + "|" + f]] && S.cods[S.asig[emp.id + "|" + f]].solo_responsables);
+  const dias = servicio.filter(f => !pasados.includes(f) && !reservados.includes(f));
+  if (!dias.length) { toast("En ese rango no hay ningún día de servicio que se pueda cambiar", 4000); return; }
+  const pl = n => n === 1 ? "" : "s";
+  const dlg = h("dialog", {});
+  const msg = h("div", { class: "error" });
+  const conCodigo = dias.filter(f => S.asig[emp.id + "|" + f]);
+  const elegir = async (codigo, btn) => {
+    let objetivo = dias;
+    const distintos = dias.filter(f => S.asig[emp.id + "|" + f] && S.asig[emp.id + "|" + f] !== codigo);
+    if (codigo && distintos.length) {
+      const lista = distintos.map(f => `${fechaSem(f)} (${S.asig[emp.id + "|" + f]})`).join(", ");
+      if (!confirm(`${distintos.length} día${pl(distintos.length)} ya tiene${distintos.length === 1 ? "" : "n"} otro código: ${lista}.\n\nAceptar = sustituirlo${distintos.length === 1 ? "" : "s"} por ${codigo}\nCancelar = dejarlo${distintos.length === 1 ? "" : "s"} como está${distintos.length === 1 ? "" : "n"}`))
+        objetivo = dias.filter(f => !distintos.includes(f));
+    }
+    if (codigo) objetivo = objetivo.filter(f => S.asig[emp.id + "|" + f] !== codigo);
+    else objetivo = objetivo.filter(f => S.asig[emp.id + "|" + f]);
+    if (!objetivo.length) { dlg.close(); toast("No había nada que cambiar"); return; }
+    btn.disabled = true; msg.textContent = "Guardando…";
+    const { error } = codigo
+      ? await sb.from("asignaciones").upsert(objetivo.map(f => ({ empleado_id: emp.id, fecha: f, codigo })), { onConflict: "empleado_id,fecha" })
+      : await sb.from("asignaciones").delete().eq("empleado_id", emp.id).in("fecha", objetivo);
+    if (error) { btn.disabled = false; msg.textContent = "No se pudo guardar: " + error.message; return; }
+    for (const f of objetivo) {
+      const k = emp.id + "|" + f;
+      if (codigo) { S.asig[k] = codigo; R.asig[k] = codigo; } else { delete S.asig[k]; delete R.asig[k]; }
+      if (S.picos) { if (codigo === "PICO") S.picos.add(k); else S.picos.delete(k); }
+    }
+    dlg.close();
+    toast(codigo ? `${codigo} puesto en ${objetivo.length} día${pl(objetivo.length)}` : `Quitado el código de ${objetivo.length} día${pl(objetivo.length)}`, 3000);
+  };
+  const avisos = [
+    todos.length > servicio.length ? `${todos.length - servicio.length} día${pl(todos.length - servicio.length)} libre${pl(todos.length - servicio.length)} del ciclo se salta${todos.length - servicio.length === 1 ? "" : "n"}.` : null,
+    pasados.length ? `${pasados.length} día${pl(pasados.length)} ya pasado${pl(pasados.length)}: no se toca${pasados.length === 1 ? "" : "n"}.` : null,
+    reservados.length ? `${reservados.length} día${pl(reservados.length)} con PICO/DESP: solo lo cambia un responsable.` : null].filter(Boolean);
+  dlg.append(...[
+    h("h3", {}, emp.nombre),
+    h("p", { class: "sub rango" }, h("b", {}, `${fechaSem(desde)} → ${fechaSem(hasta)}`), ` · ${dias.length} día${pl(dias.length)} de servicio`),
+    h("div", { class: "rdias" }, dias.map(f => h("span", { class: "rd" + (S.asig[emp.id + "|" + f] ? " con" : "") }, fechaSem(f), S.asig[emp.id + "|" + f] ? h("small", {}, " " + S.asig[emp.id + "|" + f]) : null))),
+    avisos.length ? h("small", { class: "det" }, avisos.join(" ")) : null,
+    h("div", { class: "contenido" }, seccionesCodigos(emp, "", elegir)),
+    msg,
+    h("div", { class: "fila" },
+      h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cerrar"),
+      conCodigo.length ? h("button", { class: "btn sec", onclick: ev => elegir("", ev.currentTarget) }, "Quitar códigos") : null)].filter(Boolean));
   dlg.addEventListener("close", () => { dlg.remove(); pintar(); });
   document.body.append(dlg); dlg.showModal();
 }
