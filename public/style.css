@@ -352,3 +352,7 @@ dialog .dcab{display:flex;align-items:flex-start;justify-content:space-between;g
 .rd{background:var(--gris);border-radius:6px;padding:.15rem .4rem;font-size:.8rem}
 .rd.con{background:var(--esp);color:var(--esp-t)}
 dialog .dcab .btn{white-space:nowrap;flex:none}
+
+.btn.varios{background:#f1bf00;color:#0f2a4a;font-weight:800;border:0;padding:.45rem .75rem;border-radius:10px;box-shadow:0 2px 8px #f1bf0066;display:inline-flex;align-items:center;gap:.35rem}
+.btn.varios:hover{background:#ffcd1a}
+.btn.varios .vi{font-size:1rem;line-height:1}

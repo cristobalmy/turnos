@@ -707,7 +707,7 @@ function abrirEdicion(emp, f, hasta) {
   dlg.append(...[
     h("div", { class: "dcab" },
       h("div", {}, h("h3", {}, emp.nombre), h("p", { class: "sub" }, `${DLARGO[new Date(y, m - 1, d).getDay()]} ${d}/${m}/${y} · turno ${TURNO_NOMBRE[S.dias[f]] ? TURNO_NOMBRE[S.dias[f]].toLowerCase() : "?"}`)),
-      h("button", { class: "btn sec mini", title: "Elegir hasta qué día", onclick: () => { S.rango = { emp, desde: f }; dlg.close(); toast(`Ahora toca el último día en la fila de ${emp.nombre}`, 3000); } }, "Varios días")),
+      h("button", { class: "btn mini varios", title: "Elegir hasta qué día", onclick: () => { S.rango = { emp, desde: f }; dlg.close(); toast(`Ahora toca el último día en la fila de ${emp.nombre}`, 3000); } }, h("span", { class: "vi" }, "📅"), "Varios días")),
     cand.length ? h("div", { class: "cand" }, "Candidatos a PICO (libres con su binomio ausente): " + cand.map(c => c.nombre).join(", ")) : null,
     h("div", { class: "contenido" }, seccionesCodigos(emp, actual, elegir)),
     emp.id === S.me.id ? bloqueNota(f) : null,
