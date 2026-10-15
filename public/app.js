@@ -987,7 +987,7 @@ function vistaInformes() {
   const filas = () => (S.infAnio[S.infY] || []).filter(r => r.fecha < hoy);   // solo lo ya disfrutado
   const dibujar = () => {
     const rows = filas();
-    const sel = h("select", { onchange: ev => { S.infEmp = +ev.target.value; dibujar(); } },
+    const sel = h("select", { class: "infsel", title: "Elegir persona", onchange: ev => { S.infEmp = +ev.target.value; dibujar(); } },
       (esResp() ? S.emps : [S.me]).map(e => h("option", { value: e.id, selected: e.id === S.infEmp }, e.nombre)));
     const propias = rows.filter(r => r.empleado_id === S.infEmp);
     const porCodigo = {};
@@ -1008,10 +1008,10 @@ function vistaInformes() {
     cont.replaceChildren(
       h("div", { class: "mes" },
         h("button", { disabled: S.infY <= S.anioMin, onclick: async () => { S.infY--; await cargarAnio(S.infY); dibujar(); } }, "‹"), h("b", {}, S.infY),
-        h("button", { disabled: S.infY >= S.anioMax, onclick: async () => { S.infY++; await cargarAnio(S.infY); dibujar(); } }, "›")),
+        h("button", { disabled: S.infY >= S.anioMax, onclick: async () => { S.infY++; await cargarAnio(S.infY); dibujar(); } }, "›"),
+        esResp() ? h("div", { class: "mesacc" }, sel) : null),
       h("div", { class: "pag anchoanio" },
-        h("h2", {}, S.infEmp === S.me.id ? "Mi año" : `Año de ${nombreEmp(S.infEmp)}`), esResp() ? sel : null,
-        bloqueMiAnio(S.infEmp, S.infY)),
+        h("h2", {}, S.infEmp === S.me.id ? "Mi año" : `Año de ${nombreEmp(S.infEmp)}`), bloqueMiAnio(S.infEmp, S.infY)),
       h("div", { class: "pag ancho" },
         h("h2", {}, S.infEmp === S.me.id ? "Mis días" : `Días de ${nombreEmp(S.infEmp)}`), esResp() ? null : h("p", { class: "sub" }, S.me.nombre),
         h("p", { class: "sub" }, "Solo cuentan los días ya pasados."),
