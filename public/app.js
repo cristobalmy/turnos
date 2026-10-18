@@ -305,10 +305,11 @@ function cabecera() {
 }
 function pintar() {
   const w = $app.querySelector(".wrap");
-  const pos = w ? [w.scrollLeft, w.scrollTop] : null;
+  const pos = w ? [w.scrollLeft, w.scrollTop] : null, vistaAntes = S._vistaPintada, yPag = window.scrollY;
   const vacio = !S.emps.length && (S.vista === "res" || S.vista === "cal" || S.vista === "inf");
   const cuerpo = vacio ? distritoVacio() : S.vista === "res" ? vistaResumen() : S.vista === "cal" ? vistaCalendario() : S.vista === "hist" ? vistaHistorial() : S.vista === "form" ? vistaFormacion() : S.vista === "inf" ? vistaInformes() : vistaCuenta();
   $app.replaceChildren(cabecera(), cuerpo);
+  S._vistaPintada = S.vista;
   if (S.vista !== "cal") return;
   const nw = $app.querySelector(".wrap");
   if (!S.yaScroll) {
@@ -316,6 +317,7 @@ function pintar() {
     if (hoy) nw.scrollLeft = Math.max(0, hoy.offsetLeft - nw.clientWidth / 2);
     S.yaScroll = true;
   } else if (pos) { nw.scrollLeft = pos[0]; nw.scrollTop = pos[1]; }
+  if (vistaAntes === "cal") window.scrollTo(0, yPag);   // al tocar un día, la página no salta
 }
 
 function resumenDia() {
