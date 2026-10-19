@@ -427,8 +427,9 @@ function panelBloque(titulo, k, clase) {
     }))),
     h("tbody", {},
       fila("Turno", "rt", f => h("td", {}, h("span", { class: "tur " + tl(R.dias[f]) }, tl(R.dias[f])))),
-      fila("Trabajan", "rn", f => { const n = S.emps.filter(e => trabajaR(e.id, f)).length; return h("td", { class: n < S.minimo ? "bajo" : "ok" }, n); }),
-      fila("Tercio", "rn", f => { const n = tercioR(f); return h("td", { class: n > S.tercio ? "bajo" : "ok" }, n); }),
+      // Trabajan: número y debajo la lista de quién trabaja
+      fila("Trabajan", "rl rtrab", f => { const qs = S.emps.filter(e => trabajaR(e.id, f)), n = qs.length;
+        return h("td", {}, h("div", { class: "rcuenta " + (n < S.minimo ? "bajo" : "ok") }, n), h("ul", {}, qs.map(e => persona(e, f, true)))); }),
       fila("Pico", "rp", f => {
         if (f < hoy) return h("td", {}, "–");
         const ya = S.emps.filter(e => R.asig[e.id + "|" + f] === "PICO").map(e => e.nombre);
@@ -437,8 +438,10 @@ function panelBloque(titulo, k, clase) {
         const r = recomendarPico(f, R.asig);
         return h("td", {}, r.length ? h("b", {}, r[0].e.nombre) : h("small", {}, "nadie"));
       }),
-      fila("Trabajando", "rl", f => h("td", {}, h("ul", {}, S.emps.filter(e => trabajaR(e.id, f)).map(e => persona(e, f, true))))),
-      fila("Ausencias", "rl", f => h("td", {}, h("ul", {}, S.emps.filter(e => !trabajaR(e.id, f)).map(e => persona(e, f))))),
+      // Libran: número, el tercio (máx.) y debajo la lista de ausencias con su código
+      fila("Libran", "rl rlib", f => { const qs = S.emps.filter(e => !trabajaR(e.id, f)), t = tercioR(f);
+        return h("td", {}, h("div", { class: "rcuenta " + (t > S.tercio ? "bajo" : "ok") }, qs.length, h("small", {}, `tercio ${t}/${S.tercio}`)),
+          h("ul", {}, qs.map(e => persona(e, f)))); }),
       fechas.some(f => S.notas[f]) ? fila("Mi nota", "rnota", f => h("td", {}, S.notas[f] ? h("small", {}, S.notas[f]) : "")) : null,
       hayQuitar ? fila("Quitarse", "rq", f => {
         if (f < hoy || tercioR(f) <= S.tercio) return h("td", {});
