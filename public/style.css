@@ -218,7 +218,8 @@ table.res .rp td{font-size:.8rem}table.res .rp small{display:block;color:var(--s
 table.res .rl td{text-align:left;padding:.3rem .35rem}
 table.res ul{list-style:none;margin:0;padding:0}
 table.res li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.3rem;padding:.12rem 0;font-size:.85rem}
-table.res li .pn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.res li .pn{overflow-wrap:anywhere;line-height:1.15}
+table.res li .pn .rayo{white-space:nowrap}
 table.res li .cod{text-align:center;padding:2px 0;min-width:2.7em}
 
 table.res tbody th,table.res thead th:first-child{position:sticky;left:0;z-index:1}
