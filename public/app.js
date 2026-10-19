@@ -172,6 +172,7 @@ async function arrancar() {
   S.anioMax = r2.data && r2.data[0] ? +r2.data[0].fecha.slice(0, 4) : S.y;
   S.picos = new Set((pc.data || []).map(x => x.empleado_id + "|" + x.fecha));
   await Promise.all([cargarMes(), cargarResumen()]);
+  cargarForms().then(() => { if (S.vista === "res") pintar(); });   // para el ⚡ del Taser en el Resumen
   suscribir();
   pintar();
 }
@@ -417,7 +418,8 @@ function panelBloque(titulo, k, clase) {
   const tercioR = f => S.emps.filter(e => { const c = R.asig[e.id + "|" + f]; return c && S.cods[c] && S.cods[c].tipo === "Ausencia Justificada"; }).length;
   const hayQuitar = fechas.some(f => f >= hoy && tercioR(f) > S.tercio);
   const fila = (etq, cls, celda) => h("tr", { class: cls }, h("th", {}, etq), fechas.map(f => celda(f)));
-  const persona = (e, f) => { const c = R.asig[e.id + "|" + f]; return h("li", {}, h("span", { class: "pn" }, e.nombre), c ? h("span", { class: "cod " + claseTipo(c) }, c) : null); };
+  const persona = (e, f, rayo) => { const c = R.asig[e.id + "|" + f], tz = rayo && taserDe(e.id);
+    return h("li", {}, h("span", { class: "pn" }, e.nombre, tz ? h("span", { class: "rayo", title: "Habilitado " + tz }, "⚡") : null), c ? h("span", { class: "cod " + claseTipo(c) }, c) : null); };
   const tabla = h("table", { class: "res" },
     h("thead", {}, h("tr", {}, h("th", {}, ""), fechas.map(f => {
       const [y, m, d] = f.split("-").map(Number);
@@ -435,7 +437,7 @@ function panelBloque(titulo, k, clase) {
         const r = recomendarPico(f, R.asig);
         return h("td", {}, r.length ? h("b", {}, r[0].e.nombre) : h("small", {}, "nadie"));
       }),
-      fila("Personal activo", "rl", f => h("td", {}, h("ul", {}, S.emps.filter(e => trabajaR(e.id, f)).map(e => persona(e, f))))),
+      fila("Personal activo", "rl", f => h("td", {}, h("ul", {}, S.emps.filter(e => trabajaR(e.id, f)).map(e => persona(e, f, true))))),
       fila("Ausencias", "rl", f => h("td", {}, h("ul", {}, S.emps.filter(e => !trabajaR(e.id, f)).map(e => persona(e, f))))),
       fechas.some(f => S.notas[f]) ? fila("Mi nota", "rnota", f => h("td", {}, S.notas[f] ? h("small", {}, S.notas[f]) : "")) : null,
       hayQuitar ? fila("Quitarse", "rq", f => {
@@ -818,6 +820,12 @@ const alfa = (x, y) => x.localeCompare(y, "es", { numeric: true, sensitivity: "b
 const cmpRegistros = (f, g) => (RANGO_TIPO[tipoDe(f.nombre)] ?? 0) - (RANGO_TIPO[tipoDe(g.nombre)] ?? 0)
   || alfa(f.nombre, g.nombre) || (g.fecha || "").localeCompare(f.fecha || "");
 const tipoDe = nombre => { const c = (S.cursos || []).find(x => x.nombre === nombre); return c ? c.tipo : "Formación"; };
+// ⚡ en el Resumen: quien tiene la habilitación IE - Taser 7 o IE - Taser 10
+const ES_TASER = /^IE\s*-\s*Taser\s*(7|10)\b/i;
+function taserDe(empId) {
+  const ts = [...new Set((S.forms || []).filter(f => f.empleado_id === empId && ES_TASER.test(f.nombre)).map(f => f.nombre.replace(/^IE\s*-\s*/i, "")))];
+  return ts.length ? ts.sort().join(" y ") : "";
+}
 async function cargarForms() {
   const { data, error } = await sb.from("formaciones").select("*").order("fecha", { ascending: false, nullsFirst: false });
   if (error) { toast("No se pudieron cargar las formaciones: " + error.message, 6000); return; }
