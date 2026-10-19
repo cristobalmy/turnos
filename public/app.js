@@ -437,7 +437,7 @@ function panelBloque(titulo, k, clase) {
         const r = recomendarPico(f, R.asig);
         return h("td", {}, r.length ? h("b", {}, r[0].e.nombre) : h("small", {}, "nadie"));
       }),
-      fila("Personal activo", "rl", f => h("td", {}, h("ul", {}, S.emps.filter(e => trabajaR(e.id, f)).map(e => persona(e, f, true))))),
+      fila("Trabajando", "rl", f => h("td", {}, h("ul", {}, S.emps.filter(e => trabajaR(e.id, f)).map(e => persona(e, f, true))))),
       fila("Ausencias", "rl", f => h("td", {}, h("ul", {}, S.emps.filter(e => !trabajaR(e.id, f)).map(e => persona(e, f))))),
       fechas.some(f => S.notas[f]) ? fila("Mi nota", "rnota", f => h("td", {}, S.notas[f] ? h("small", {}, S.notas[f]) : "")) : null,
       hayQuitar ? fila("Quitarse", "rq", f => {
