@@ -48,3 +48,6 @@ Pruebas: `bash tests/rls.sh`, `node tests/mensaje.test.mjs`, `node tests/funcion
 3. SQL Editor: ejecutar `supabase/migracion_002_avisos.sql` con `__SECRETO__` sustituido por el valor de `AVISO_SECRET`.
 4. En cada móvil: Cuenta → *Activar avisos* (en iPhone, con la app instalada en la pantalla de inicio).
 La clave pública VAPID va en `public/config.js`; la privada y el secreto nunca se suben al repositorio.
+
+## Licencia
+© 2026 cefh. Todos los derechos reservados. Ver `LICENSE`: no se permite copiar ni reutilizar el código sin permiso del autor.

@@ -1390,7 +1390,8 @@ function vistaCuenta() {
     S.me.admin ? bloqueAdmin() : null,
     S.me.admin ? [h("h3", {}, "Copia de seguridad"), h("p", { class: "sub" }, "Descarga todo (calendario, asignaciones, formaciones y cambios) en un archivo que abre Excel. Guárdalo de vez en cuando."),
       h("button", { class: "btn sec full", onclick: ev => descargarCopia(ev.currentTarget, msgCopia) }, "Descargar copia"), msgCopia] : null,
-    h("hr"), h("button", { class: "btn sec full", onclick: salir }, "Cerrar sesión"));
+    h("hr"), h("button", { class: "btn sec full", onclick: salir }, "Cerrar sesión"),
+    h("p", { class: "derechos" }, "© 2026 cefh. Todos los derechos reservados."));
 }
 
 if ("serviceWorker" in navigator) {

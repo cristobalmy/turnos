@@ -396,3 +396,4 @@ table.res .rcuenta{font-weight:800;font-size:1.05rem;text-align:center;margin:-.
 table.res .rcuenta.ok{color:var(--verde)}table.res .rcuenta.bajo{color:var(--rojo);background:var(--bajo)}
 table.res .rcuenta small{display:block;font-size:.68rem;font-weight:700}
 @media (min-width:760px){.resumenPag{max-width:1150px}table.res{min-width:0}}
+.derechos{color:var(--suave);font-size:.75rem;text-align:center;margin:1.2rem 0 .4rem}
