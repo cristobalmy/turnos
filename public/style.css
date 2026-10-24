@@ -399,3 +399,5 @@ table.res .rcuenta small{display:block;font-size:.68rem;font-weight:700}
 .derechos{color:var(--suave);font-size:.75rem;text-align:center;margin:1.2rem 0 .4rem}
 /* días libres: el código en letra más pequeña para que no ensanche la columna (p. ej. JUICIO) */
 .cal td.libre .cod{font-size:.56rem;padding:2px 2px;min-width:0;letter-spacing:-.02em}
+.itit{margin:.7rem 0 .1rem;font-size:.85rem;color:var(--suave);text-transform:uppercase;letter-spacing:.04em}
+.itot.trab div{background:var(--azul-claro)}

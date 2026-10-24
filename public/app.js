@@ -990,6 +990,18 @@ function bloqueMiAnio(empId, y) {
     h("small", { class: "det" }, "Toca un día para abrirlo en el calendario."));
 }
 
+// Días trabajados en el año (solo días ya pasados): días de mañana, tarde o noche del ciclo
+// en los que la persona no tiene código o tiene uno que cuenta como trabajo (PICO, JUICIO…).
+function trabajadosAnio(empId, y, propias, hoy) {
+  const cod = {}; for (const r of propias) cod[r.fecha] = r.codigo;
+  const n = { M: 0, T: 0, N: 0 };
+  for (let d = new Date(Date.UTC(y, 0, 1)); d.getUTCFullYear() === y; d.setUTCDate(d.getUTCDate() + 1)) {
+    const f = d.toISOString().slice(0, 10); if (f >= hoy) break;
+    const t = turnoCiclo(f); if (!(t in n)) continue;
+    const c = cod[f]; if (!c || (S.cods[c] && S.cods[c].cuenta_como_trabajo)) n[t]++;
+  }
+  return [[n.M, "Mañanas"], [n.T, "Tardes"], [n.N, "Noches"], [n.M + n.T + n.N, "Total"]].map(([v, etq]) => h("div", {}, h("b", {}, v), h("small", {}, etq)));
+}
 // ---------- informes ----------
 S.infY = 0; S.infEmp = 0;
 function vistaInformes() {
@@ -1029,6 +1041,8 @@ function vistaInformes() {
         h("div", { class: "itot" }, [
           [["CH", "CJ", "JS"], "CH · CJ · JS"], [["V1", "V2", "V3"], "Vacaciones"], [["AP"], "AP"], [["SS", "NAV"], "Semana Santa y Navidad"],
         ].map(([cs, etq]) => h("div", {}, h("b", {}, propias.filter(r => cs.includes(r.codigo)).length), h("small", {}, etq)))),
+        h("h4", { class: "itit" }, "Días trabajados"),
+        h("div", { class: "itot trab" }, trabajadosAnio(S.infEmp, S.infY, propias, hoy)),
         codigos.length ? tarjetas : h("p", { class: "det" }, "Todavía no hay días apuntados.")),
       h("div", { class: "pag ancho" },
         h("h2", {}, "Reparto de picos"), h("p", { class: "sub" }, "Ordenado por el último pico: arriba quien lo hizo más recientemente; abajo quien más tiempo lleva sin hacerlo (le tocaría antes)."),
