@@ -407,3 +407,11 @@ table.res .rcuenta small{display:block;font-size:.68rem;font-weight:700}
   nav.tabs button span{display:block;max-width:100%;overflow:hidden}
 }
 @media (max-width:359px){nav.tabs button{font-size:.6rem;letter-spacing:-.01em}}
+/* Resumen: columna fija de la izquierda. En el iPhone (Safari), con bordes «colapsados» las letras de los días
+   se pintaban por encima de la columna fija al deslizar. Con bordes separados y la columna en una capa superior, no. */
+table.res{border-collapse:separate;border-spacing:0;border-top:1px solid var(--borde);border-left:1px solid var(--borde)}
+table.res th,table.res td{border:0;border-right:1px solid var(--borde);border-bottom:1px solid var(--borde)}
+table.res tbody th,table.res thead th:first-child{position:-webkit-sticky;position:sticky;left:0;z-index:3;background-clip:padding-box;box-shadow:2px 0 0 var(--borde)}
+table.res tbody th{background:var(--fondo)}
+table.res thead th:first-child{z-index:4;background:var(--azul-claro)}
+table.res td{position:relative;z-index:1}
