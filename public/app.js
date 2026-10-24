@@ -293,7 +293,13 @@ const tl = t => (t === "S" ? "L" : t || "");      // la "S" (saliente) se muestr
 const DLARGO = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
 
 function cabecera() {
-  const b = (v, txt) => h("button", { class: S.vista === v ? "on" : "", onclick: () => { S.vista = v; pintar(); } }, icono(v), txt);
+  // La barra de pestañas se crea una sola vez y se reutiliza: así sus iconos no se vuelven a dibujar en cada cambio
+  // (en el iPhone, al rehacerlos, a veces alguno no llegaba a verse). Solo se actualiza cuál está marcada.
+  if (!S.navTabs) {
+    const b = (v, txt) => h("button", { "data-v": v, onclick: () => { S.vista = v; pintar(); } }, icono(v), h("span", {}, txt));
+    S.navTabs = h("nav", { class: "tabs" }, b("res", "Resumen"), b("cal", "Calendario"), b("form", "Formación"), b("inf", "Informes"), b("hist", "Cambios"), b("cuenta", "Cuenta"));
+  }
+  for (const bt of S.navTabs.children) bt.classList.toggle("on", bt.dataset.v === S.vista);
   return h("header", {},
     modoAdmin()
       ? h("div", { class: "marca admin" },
@@ -301,7 +307,7 @@ function cabecera() {
           h("button", { class: "seldis", title: "Elegir distrito", onclick: ev => menuDistritos(ev.currentTarget) }, h("span", {}, S.dist.nombre), h("b", {}, "▾")),
           h("span", { class: "adm" }, "ADMIN"))
       : h("div", { class: "marca" }, h("i", {}, S.dist.turno), S.dist.nombre),
-    h("nav", { class: "tabs" }, b("res", "Resumen"), b("cal", "Calendario"), b("form", "Formación"), b("inf", "Informes"), b("hist", "Cambios"), b("cuenta", "Cuenta")),
+    S.navTabs,
     h("span", { class: "yo" }, S.me.nombre));
 }
 function pintar() {

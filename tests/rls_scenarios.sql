@@ -99,8 +99,8 @@ rollback;
 
 \echo == Días pasados
 begin;
-insert into asignaciones(empleado_id,fecha,codigo) values (4,(now() at time zone 'Europe/Madrid')::date - 3,'V1');
-insert into asignaciones(empleado_id,fecha,codigo) values (3,(now() at time zone 'Europe/Madrid')::date - 3,'V1');
+insert into asignaciones(empleado_id,fecha,codigo) values (4,(now() at time zone 'Europe/Madrid')::date - 3,'V1') on conflict do nothing;
+insert into asignaciones(empleado_id,fecha,codigo) values (3,(now() at time zone 'Europe/Madrid')::date - 3,'V1') on conflict do nothing;
 set local role authenticated; select set_config('request.jwt.claims','{"email":"gustavo@t.es"}',true);
 select pg_temp.chk(pg_temp.falla(format($f$insert into asignaciones(empleado_id,fecha,codigo) values (4,%L,'AP')$f$, (now() at time zone 'Europe/Madrid')::date - 1)), 'un agente NO puede apuntar un día pasado');
 select pg_temp.chk(pg_temp.falla(format($f$update asignaciones set codigo='AP' where empleado_id=4 and fecha=%L$f$, (now() at time zone 'Europe/Madrid')::date - 3)), 'un agente NO puede cambiar un día pasado');

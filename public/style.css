@@ -401,3 +401,9 @@ table.res .rcuenta small{display:block;font-size:.68rem;font-weight:700}
 .cal td.libre .cod{font-size:.56rem;padding:2px 2px;min-width:0;letter-spacing:-.02em}
 .itit{margin:.7rem 0 .1rem;font-size:.85rem;color:var(--suave);text-transform:uppercase;letter-spacing:.04em}
 .itot.trab div{background:var(--azul-claro)}
+@media (max-width:700px){
+  /* barra de abajo en su propia capa: evita que en el iPhone desaparezca algún icono al desplazarse */
+  nav.tabs{transform:translateZ(0);-webkit-backface-visibility:hidden;backface-visibility:hidden}
+  nav.tabs button span{display:block;max-width:100%;overflow:hidden}
+}
+@media (max-width:359px){nav.tabs button{font-size:.6rem;letter-spacing:-.01em}}
