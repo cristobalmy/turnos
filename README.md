@@ -39,7 +39,7 @@ Después, `supabase/migracion_017_aviso_pico.sql` (aviso del PICO la tarde de an
 Después, `supabase/migracion_019_fuera_temporal.sql` (personas «fuera temporalmente»: entran y ven el calendario pero no cuentan).
 Comprobar los avisos: `supabase/comprobar_avisos.sql` (no cambia datos).
 
-Edge Functions (Verify JWT desactivado en todas): `avisar` (avisos y alerta de tercio, solo a la gente del mismo distrito), `calendario` (enlace .ics personal, con el ciclo del turno de su distrito) `pico` (la tarde de antes, a las 20:00, avisa a los responsables si al día siguiente hace falta PICO y a quién le toca; lo programa `supabase/migracion_017_aviso_pico.sql`) y `alta` (el administrador da de alta personas desde la app: crea la cuenta con contraseña provisional y la ficha en el distrito).
+Edge Functions (Verify JWT desactivado en todas): `avisar` (avisos y alerta de tercio, solo a la gente del mismo distrito), `calendario` (enlace .ics personal, con el ciclo del turno de su distrito) `pico` (el día de antes a las 10:00 avisa a los responsables si al día siguiente hace falta PICO y a quién le toca; lo programa `supabase/migracion_017_aviso_pico.sql`; la hora se cambió en la `migracion_020_pico_a_las_10.sql`) y `alta` (el administrador da de alta personas desde la app: crea la cuenta con contraseña provisional y la ficha en el distrito).
 Pruebas: `bash tests/rls.sh`, `node tests/mensaje.test.mjs`, `node tests/funciones.test.mjs`.
 
 ## Avisos al móvil (opcional)

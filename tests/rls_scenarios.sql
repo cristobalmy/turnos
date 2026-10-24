@@ -209,7 +209,7 @@ select pg_temp.chk(pg_temp.falla($$insert into distritos(nombre, letra, zona) va
 rollback;
 
 \echo == Migración 017: aviso del PICO
-select pg_temp.chk((select count(*) from cron.job where jobname = 'aviso-pico' and schedule = '0 18,19 * * *') = 1, 'el aviso del PICO queda programado una sola vez');
+select pg_temp.chk((select count(*) from cron.job where jobname = 'aviso-pico' and schedule = '0 8,9 * * *') = 1, 'el aviso del PICO queda programado una sola vez, a las 10:00 de Madrid');
 select pg_temp.chk((select command like '%functions/v1/pico%' and command like '%secreto-de-prueba%' from cron.job where jobname = 'aviso-pico'), 'llama a la función pico con el secreto de los avisos');
 
 \echo == Migración 018: los avisos esperan 30 segundos

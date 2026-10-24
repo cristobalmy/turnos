@@ -1,7 +1,7 @@
 // @ts-nocheck
-// Edge Function "pico": la tarde de antes (20:00, hora de Madrid) avisa a los responsables de cada distrito
+// Edge Function "pico": el día de antes a las 10:00 (hora de Madrid) avisa a los responsables de cada distrito
 // si al día siguiente hace falta PICO y a quién le toca. No pone nada: el PICO lo sigue poniendo un responsable a mano.
-// La llama Supabase Cron (migración 017). Verify JWT desactivado: la protege el mismo secreto que "avisar" (AVISO_SECRET).
+// La llama Supabase Cron (migración 017; hora cambiada a las 10:00 en la 020). Verify JWT desactivado: la protege el mismo secreto que "avisar" (AVISO_SECRET).
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import webpush from "npm:web-push@3.6.7";
 
@@ -48,9 +48,9 @@ Deno.serve(async (req) => {
   if (req.headers.get("x-aviso-secret") !== Deno.env.get("AVISO_SECRET")) return new Response("no autorizado", { status: 401 });
   let opc = {};
   try { opc = await req.json(); } catch (e) { /* sin cuerpo */ }
-  // El cron llama a las 18:00 y a las 19:00 UTC; solo se avisa la que cae a las 20:00 en Madrid (verano e invierno).
+  // El cron llama a las 8:00 y a las 9:00 UTC; solo se avisa la que cae a las 10:00 en Madrid (verano e invierno).
   const horaMadrid = Number(new Date().toLocaleString("en-GB", { timeZone: "Europe/Madrid", hour: "2-digit", hour12: false }));
-  if (!opc.prueba && horaMadrid !== 20) return new Response("no es la hora (" + horaMadrid + ")");
+  if (!opc.prueba && horaMadrid !== 10) return new Response("no es la hora (" + horaMadrid + ")");
 
   const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
   const manana = masDias(hoy, 1);
