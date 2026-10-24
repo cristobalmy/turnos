@@ -397,3 +397,5 @@ table.res .rcuenta.ok{color:var(--verde)}table.res .rcuenta.bajo{color:var(--roj
 table.res .rcuenta small{display:block;font-size:.68rem;font-weight:700}
 @media (min-width:760px){.resumenPag{max-width:1150px}table.res{min-width:0}}
 .derechos{color:var(--suave);font-size:.75rem;text-align:center;margin:1.2rem 0 .4rem}
+/* días libres: el código en letra más pequeña para que no ensanche la columna (p. ej. JUICIO) */
+.cal td.libre .cod{font-size:.56rem;padding:2px 2px;min-width:0;letter-spacing:-.02em}
