@@ -1,5 +1,5 @@
 // Service worker: guarda la "cáscara" de la app para abrirla rápido y muestra los avisos push.
-const V = "turnos-v65";
+const V = "turnos-v66";
 const SHELL = ["./", "index.html", "app.js", "style.css", "config.js", "icon.svg", "icon-192.png", "manifest.webmanifest"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(V).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener("activate", e => {
@@ -8,6 +8,11 @@ self.addEventListener("activate", e => {
 });
 self.addEventListener("fetch", e => {
   const u = new URL(e.request.url);
+  // La librería de Supabase va con versión fija en la dirección (nunca cambia): se guarda la primera vez y luego sale de la caché al instante.
+  if (e.request.method === "GET" && u.hostname === "cdn.jsdelivr.net" && /@\d+\.\d+\.\d+\//.test(u.pathname)) {
+    e.respondWith(caches.match(e.request).then(m => m || fetch(e.request).then(r => { if (r.ok || r.type === "opaque") { const cp = r.clone(); caches.open(V).then(c => c.put(e.request, cp)); } return r; })));
+    return;
+  }
   if (e.request.method !== "GET" || u.origin !== location.origin) return;
   // primero red (para ver siempre la última versión), caché si no hay conexión
   e.respondWith(fetch(e.request).then(r => { const cp = r.clone(); caches.open(V).then(c => c.put(e.request, cp)); return r; })

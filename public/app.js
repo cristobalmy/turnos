@@ -142,10 +142,12 @@ async function arrancar() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return pantallaLogin();
   const email = (session.user.email || "").toLowerCase();
+  // Todo lo que no depende de otra cosa se pide a la vez (antes iba por turnos y la app tardaba más en abrir).
   const [e, c, cfg] = await Promise.all([
     sb.from("empleados").select("*").order("orden"),
     sb.from("codigos").select("*").order("orden"),
     sb.from("config").select("*"),
+    cargarDistritos(),
   ]);
   if (e.error || c.error) return sinAcceso("No se pudieron cargar los datos. Comprueba la conexión.");
   S.fichas = e.data;
@@ -159,18 +161,16 @@ async function arrancar() {
   S.me = S.todos.find(x => (x.email || "").toLowerCase() === email) || null;
   if (!S.me) return sinAcceso("Tu cuenta no está autorizada en Tercio. Habla con un responsable.");
   if (S.me.clave_cambiada === false) return pantallaNuevaClave(true);
-  await cargarDistritos();
   const guardado = modoAdmin() && (S.distritos || []).find(d => String(d.id) === leerLS(DIST_KEY));
   ponerDistrito(Object.assign({ minimo_operativo: S.minimo, tercio: S.tercio }, guardado || miDistrito()));
   const t = new Date(); S.y = t.getFullYear(); S.m = t.getMonth(); S.sel = hoyStr();
   const [r1, r2] = await Promise.all([
     sb.from("dias").select("fecha").order("fecha").limit(1),
     sb.from("dias").select("fecha").order("fecha", { ascending: false }).limit(1),
-    cargarPicos(),
+    cargarPicos(), cargarMes(), cargarResumen(),
   ]);
   S.anioMin = r1.data && r1.data[0] ? +r1.data[0].fecha.slice(0, 4) : S.y;
   S.anioMax = r2.data && r2.data[0] ? +r2.data[0].fecha.slice(0, 4) : S.y;
-  await Promise.all([cargarMes(), cargarResumen()]);
   cargarForms().then(() => { if (S.vista === "res") pintar(); });   // para el ⚡ del Taser en el Resumen
   suscribir();
   pintar();
@@ -364,8 +364,8 @@ async function cargarResumen() {
   const k = bloqueActual(), mas = (f, n) => { const [y, m, d] = f.split("-").map(Number), t = new Date(y, m - 1, d + n); return fechaStr(t.getFullYear(), t.getMonth(), t.getDate()); };
   // se carga algo más de margen para saber cuántos días seguidos lleva cada ausencia
   const a = mas(bloqueFechas(k)[0], -30), b = mas(bloqueFechas(k + 1)[5], 30);
-  await cargarAnio(new Date().getFullYear());
-  const x = await sb.from("asignaciones").select("empleado_id,fecha,codigo").gte("fecha", a).lte("fecha", b);
+  const [, x] = await Promise.all([cargarAnio(new Date().getFullYear()),
+    sb.from("asignaciones").select("empleado_id,fecha,codigo").gte("fecha", a).lte("fecha", b)]);
   if (x.error) { toast("Error al cargar el resumen"); return; }
   R.dias = diasRango(a, b);
   R.asig = Object.fromEntries(x.data.map(r => [r.empleado_id + "|" + r.fecha, r.codigo]));
@@ -375,13 +375,15 @@ async function cargarResumen() {
 // ---------- datos del año completo (informes y recomendación de ausencias) ----------
 S.infAnio = {};
 async function cargarAnio(y) {
+  // Se piden de 2 en 2 páginas de 1000 a la vez (un año completo del distrito ronda las 1000–2000 filas).
+  const pagina = desde => sb.from("asignaciones").select("empleado_id,fecha,codigo")
+    .gte("fecha", `${y}-01-01`).lte("fecha", `${y}-12-31`).order("fecha").order("empleado_id").range(desde, desde + 999);
   const rows = [];
-  for (let desde = 0; ; desde += 1000) {
-    const { data, error } = await sb.from("asignaciones").select("empleado_id,fecha,codigo")
-      .gte("fecha", `${y}-01-01`).lte("fecha", `${y}-12-31`).order("fecha").order("empleado_id").range(desde, desde + 999);
-    if (error) { toast("Error al cargar el año"); return S.infAnio[y] || []; }
-    rows.push(...data);
-    if (data.length < 1000) break;
+  for (let desde = 0; ; desde += 2000) {
+    const res = await Promise.all([pagina(desde), pagina(desde + 1000)]);
+    if (res.some(r => r.error)) { toast("Error al cargar el año"); return S.infAnio[y] || []; }
+    for (const r of res) rows.push(...r.data);
+    if (res[1].data.length < 1000) break;
   }
   S.infAnio[y] = rows;
   return rows;
