@@ -163,14 +163,13 @@ async function arrancar() {
   const guardado = modoAdmin() && (S.distritos || []).find(d => String(d.id) === leerLS(DIST_KEY));
   ponerDistrito(Object.assign({ minimo_operativo: S.minimo, tercio: S.tercio }, guardado || miDistrito()));
   const t = new Date(); S.y = t.getFullYear(); S.m = t.getMonth(); S.sel = hoyStr();
-  const [r1, r2, pc] = await Promise.all([
+  const [r1, r2] = await Promise.all([
     sb.from("dias").select("fecha").order("fecha").limit(1),
     sb.from("dias").select("fecha").order("fecha", { ascending: false }).limit(1),
-    sb.from("asignaciones").select("empleado_id,fecha").eq("codigo", "PICO"),
+    cargarPicos(),
   ]);
   S.anioMin = r1.data && r1.data[0] ? +r1.data[0].fecha.slice(0, 4) : S.y;
   S.anioMax = r2.data && r2.data[0] ? +r2.data[0].fecha.slice(0, 4) : S.y;
-  S.picos = new Set((pc.data || []).map(x => x.empleado_id + "|" + x.fecha));
   await Promise.all([cargarMes(), cargarResumen()]);
   cargarForms().then(() => { if (S.vista === "res") pintar(); });   // para el ⚡ del Taser en el Resumen
   suscribir();
@@ -182,6 +181,12 @@ function sinAcceso(msg) {
 }
 async function salir() { await sb.auth.signOut(); if (S.canal) sb.removeChannel(S.canal); S.canal = null; pantallaLogin(); }
 
+// Todos los PICO hechos (para saber quién lleva más tiempo sin hacerlo). Se recarga al volver a la app:
+// si la app se quedó abierta en el móvil, podía faltar algún PICO puesto desde otro sitio y recomendar a quien no tocaba.
+async function cargarPicos() {
+  const pc = await sb.from("asignaciones").select("empleado_id,fecha").eq("codigo", "PICO").order("fecha", { ascending: false });
+  if (!pc.error) S.picos = new Set((pc.data || []).map(x => x.empleado_id + "|" + x.fecha));
+}
 // ---------- datos del mes ----------
 async function cargarMes() {
   const desde = fechaStr(S.y, S.m, 1), hasta = fechaStr(S.y, S.m, new Date(S.y, S.m + 1, 0).getDate());
@@ -213,7 +218,7 @@ async function refrescar() {
   if (!cambioDia && Date.now() - S.ultimaCarga < 5 * 60 * 1000) return;
   S.ultimaCarga = Date.now(); S.diaCarga = hoyStr();
   if (cambioDia) { const t = new Date(); S.y = t.getFullYear(); S.m = t.getMonth(); S.sel = hoyStr(); S.yaScroll = false; }
-  await Promise.all([cargarMes(), cargarResumen()]);
+  await Promise.all([cargarMes(), cargarResumen(), cargarPicos()]);
   if (S.vista === "cal" || S.vista === "res") pintar();
 }
 document.addEventListener("visibilitychange", refrescar);
