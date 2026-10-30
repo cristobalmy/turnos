@@ -1015,6 +1015,43 @@ function trabajadosAnio(empId, y, propias, hoy) {
   }
   return [[n.M, "Mañanas"], [n.T, "Tardes"], [n.N, "Noches"], [n.M + n.T + n.N, "Total"]].map(([v, etq]) => h("div", {}, h("b", {}, v), h("small", {}, etq)));
 }
+// ---------- reparto de Z desplazado (DESP) ----------
+// Todos los DESP de cualquier año (para la fecha del último). Son pocos.
+async function cargarDesp() {
+  const r = await sb.from("asignaciones").select("empleado_id,fecha").eq("codigo", "DESP").order("fecha", { ascending: false });
+  if (!r.error) S.desp = r.data;
+}
+// Parejas desplazadas cada día: los que tienen DESP ese día, emparejados primero por su binomio y el resto por orden de la lista.
+function parejasDesp(hasta) {
+  const porDia = {};
+  for (const x of S.desp || []) if (x.fecha < hasta) (porDia[x.fecha] = porDia[x.fecha] || []).push(x.empleado_id);
+  const ficha = id => (S.fichas || []).find(e => e.id === id) || { id, nombre: "?", orden: 999 };
+  const salida = [];
+  for (const [f, ids] of Object.entries(porDia)) {
+    let quedan = ids.map(ficha).sort((a, b) => a.orden - b.orden);
+    while (quedan.length) {
+      const a = quedan.shift(), i = quedan.findIndex(b => b.id === a.pareja_id), b = i >= 0 ? quedan.splice(i, 1)[0] : quedan.shift();
+      salida.push({ f, ps: b ? [a, b] : [a] });
+    }
+  }
+  return salida;
+}
+function repartoDesp(hoy) {
+  const clave = ps => ps.map(p => p.id).sort((x, y) => x - y).join("-");
+  const filas = {};
+  const fila = ps => filas[clave(ps)] = filas[clave(ps)] || { ps: [...ps].sort((a, b) => a.orden - b.orden), n: 0, ult: "" };
+  // Los binomios actuales del distrito salen siempre (aunque no hayan ido nunca)
+  for (const e of S.emps) { const p = S.emps.find(x => x.id === e.pareja_id); if (p && e.orden < p.orden) fila([e, p]); }
+  const delDistrito = ps => ps.some(p => p.distrito_id === S.dist.id);
+  for (const { f, ps } of parejasDesp(hoy)) {
+    if (!delDistrito(ps)) continue;
+    const r = fila(ps);
+    if (f.startsWith(String(S.infY))) r.n++;
+    if (f > r.ult) r.ult = f;
+  }
+  return Object.values(filas).map(r => ({ ...r, nombres: r.ps.map(p => p.nombre).join(" y ") }))
+    .sort((a, b) => (b.ult || "").localeCompare(a.ult || "") || a.ps[0].orden - b.ps[0].orden);
+}
 // ---------- informes ----------
 S.infY = 0; S.infEmp = 0;
 function vistaInformes() {
@@ -1062,12 +1099,16 @@ function vistaInformes() {
         h("table", { class: "ipicos" }, h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Picos"), h("th", {}, "Desplazado"), h("th", {}, "Último pico"))),
           h("tbody", {}, picosEmp.map(x => h("tr", {}, h("td", {}, x.e.nombre), h("td", {}, h("b", {}, x.n)), h("td", {}, x.d), h("td", {}, x.ult ? fechaLarga(x.ult) : "–"))))),
         null),
+      h("div", { class: "pag ancho" },
+        h("h2", {}, "Reparto de Z desplazado"), h("p", { class: "sub" }, "Por parejas (siempre van dos). Ordenado igual que los picos: arriba la pareja desplazada más recientemente; abajo la que más tiempo lleva sin ir."),
+        h("table", { class: "ipicos idesp" }, h("thead", {}, h("tr", {}, h("th", {}, "Pareja"), h("th", {}, "Veces"), h("th", {}, "Último"))),
+          h("tbody", {}, repartoDesp(hoy).map(x => h("tr", {}, h("td", {}, x.nombres), h("td", {}, h("b", {}, x.n)), h("td", {}, x.ult ? fechaLarga(x.ult) : "–")))))),
       // «Mi año» al final de la página, siempre abierto
       h("div", { class: "pag anchoanio" },
         h("h2", {}, S.infEmp === S.me.id ? "Mi año" : `Año de ${nombreEmp(S.infEmp)}`), bloqueMiAnio(S.infEmp, S.infY)));
   };
   dibujar();
-  cargarAnio(S.infY).then(dibujar);   // refresca al entrar
+  Promise.all([cargarAnio(S.infY), cargarDesp()]).then(dibujar);   // refresca al entrar
   return cont;
 }
 
