@@ -1058,8 +1058,9 @@ function repartoDesp(hoy) {
     if (f.startsWith(String(S.infY))) r.n++;
     if (f > r.ult) r.ult = f;
   }
-  // Solo las parejas que tienen algún Z desplazado puesto en el año que se está viendo
-  return Object.values(filas).filter(r => r.n > 0).map(r => ({ ...r, nombres: r.ps.map(p => p.nombre).join(" y ") }))
+  // Salen las parejas que han ido alguna vez (también años anteriores: la rotación sigue de un año a otro, como los picos).
+  // «Veces» cuenta solo el año que se está viendo; «Último» es la fecha más reciente de cualquier año.
+  return Object.values(filas).filter(r => r.ult).map(r => ({ ...r, nombres: r.ps.map(p => p.nombre).join(" y ") }))
     .sort((a, b) => (b.ult || "").localeCompare(a.ult || "") || a.ps[0].orden - b.ps[0].orden);
 }
 // ---------- pestaña Calendario: «Mensual» (la tabla de siempre) o «Anual» (los 12 meses, como «Mi año» de Informes) ----------
@@ -1133,9 +1134,9 @@ function vistaInformes() {
         h("table", { class: "ipicos" }, h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Picos"), h("th", {}, "Desplazado"), h("th", {}, "Último pico"))),
           h("tbody", {}, picosEmp.map(x => h("tr", {}, h("td", {}, x.e.nombre), h("td", {}, h("b", {}, x.n)), h("td", {}, x.d), h("td", {}, x.ult ? fechaLarga(x.ult) : "–"))))),
         null),
-      plegable("desp", "Reparto de Z desplazado", h("p", { class: "sub" }, "Por parejas (siempre van dos). Ordenado igual que los picos: arriba la pareja desplazada más recientemente; abajo la que más tiempo lleva sin ir. Solo salen las parejas que ya han ido."),
+      plegable("desp", "Reparto de Z desplazado", h("p", { class: "sub" }, "Por parejas (siempre van dos). Ordenado igual que los picos: arriba la pareja desplazada más recientemente; abajo la que más tiempo lleva sin ir. Salen las parejas que ya han ido, también en años anteriores; «Veces» es del año elegido."),
         h("table", { class: "ipicos idesp" }, h("thead", {}, h("tr", {}, h("th", {}, "Pareja"), h("th", {}, "Veces"), h("th", {}, "Último"))),
-          h("tbody", {}, repartoDesp(hoy).length ? null : h("tr", {}, h("td", { colspan: 3 }, "Todavía no hay ningún Z desplazado este año.")), repartoDesp(hoy).map(x => h("tr", {}, h("td", {}, x.nombres), h("td", {}, h("b", {}, x.n)), h("td", {}, x.ult ? fechaLarga(x.ult) : "–")))))));   // «Mi año» ya no va aquí: está en Calendario → Anual
+          h("tbody", {}, repartoDesp(hoy).length ? null : h("tr", {}, h("td", { colspan: 3 }, "Todavía no hay ningún Z desplazado.")), repartoDesp(hoy).map(x => h("tr", {}, h("td", {}, x.nombres), h("td", {}, h("b", {}, x.n)), h("td", {}, x.ult ? fechaLarga(x.ult) : "–")))))));   // «Mi año» ya no va aquí: está en Calendario → Anual
   };
   dibujar();
   Promise.all([cargarAnio(S.infY), cargarDesp()]).then(dibujar);   // refresca al entrar
