@@ -26,6 +26,9 @@ function aplicarTema() {
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", aplicarTema);
 
 // ---------- utilidades ----------
+// Vacía un elemento y le pone los hijos indicados, saltándose los vacíos (null/false) y aplanando listas.
+// (replaceChildren a secas escribía la palabra «null» en pantalla cuando un apartado no aplicaba.)
+const poner = (el, ...hijos) => el.replaceChildren(...hijos.flat(Infinity).filter(x => x != null && x !== false).map(x => x.nodeType ? x : document.createTextNode(x)));
 function h(tag, attrs, ...kids) {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
@@ -112,7 +115,7 @@ function pantallaLogin(msg) {
       // Mensaje neutro: no se revela si el correo existe.
       err.textContent = "Si ese correo está autorizado, te llegará un mensaje con un enlace para crear una contraseña nueva. Mira también el correo no deseado.";
     } }, "¿Has olvidado la contraseña?"));
-  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Bienvenido a Tercio"), h("div", { class: "sub" }, "Gestión de turnos y vacaciones"), f));
+  poner($app, h("div", { class: "login" }, h("h1", {}, "Bienvenido a Tercio"), h("div", { class: "sub" }, "Gestión de turnos y vacaciones"), f));
 }
 
 function pantallaNuevaClave(primera) {
@@ -130,7 +133,7 @@ function pantallaNuevaClave(primera) {
     await sb.rpc("marcar_clave_cambiada");
     S.recuperando = false; arrancar();
   } }, p1, p2, h("button", { class: "btn full", type: "submit" }, "Guardar contraseña"), err);
-  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, primera ? "Elige tu contraseña" : "Contraseña nueva"),
+  poner($app, h("div", { class: "login" }, h("h1", {}, primera ? "Elige tu contraseña" : "Contraseña nueva"),
     h("div", { class: "sub" }, primera ? "Es tu primer acceso: elige una contraseña propia. Solo la sabrás tú." : "Elige la que usarás desde ahora"), f,
     primera ? h("button", { class: "enlace", type: "button", onclick: salir }, "Salir") : null));
 }
@@ -176,7 +179,7 @@ async function arrancar() {
   pintar();
 }
 function sinAcceso(msg) {
-  $app.replaceChildren(h("div", { class: "login" }, h("h1", {}, "Tercio"), h("p", { class: "error" }, msg),
+  poner($app, h("div", { class: "login" }, h("h1", {}, "Tercio"), h("p", { class: "error" }, msg),
     h("button", { class: "btn", onclick: salir }, "Salir")));
 }
 async function salir() { await sb.auth.signOut(); if (S.canal) sb.removeChannel(S.canal); S.canal = null; pantallaLogin(); }
@@ -320,7 +323,7 @@ function pintar() {
   const pos = w ? [w.scrollLeft, w.scrollTop] : null, vistaAntes = S._vistaPintada, yPag = window.scrollY;
   const vacio = !S.emps.length && (S.vista === "res" || S.vista === "cal" || S.vista === "inf");
   const cuerpo = vacio ? distritoVacio() : S.vista === "res" ? vistaResumen() : S.vista === "cal" ? vistaCalendario() : S.vista === "hist" ? vistaHistorial() : S.vista === "form" ? vistaFormacion() : S.vista === "inf" ? vistaInformes() : vistaCuenta();
-  $app.replaceChildren(cabecera(), cuerpo);
+  poner($app, cabecera(), cuerpo);
   S._vistaPintada = S.vista;
   if (S.vista !== "cal") return;
   const nw = $app.querySelector(".wrap");
@@ -506,7 +509,7 @@ async function abrirSelectorMes(irA) {
   const dlg = h("dialog", {});
   const cont = h("div", {});
   const dibujar = () => {
-    cont.replaceChildren(
+    poner(cont, 
       h("div", { class: "anio" }, h("button", { disabled: anio <= S.anioMin, onclick: () => { anio--; dibujar(); } }, "‹"), h("b", {}, anio),
         h("button", { disabled: anio >= S.anioMax, onclick: () => { anio++; dibujar(); } }, "›")),
       h("div", { class: "meses" }, MESES.map((n, i) => h("button", { class: "mesb" + (anio === S.y && i === S.m ? " act" : ""), onclick: () => { dlg.close(); irA(anio, i); } }, n.slice(0, 3)))));
@@ -813,10 +816,10 @@ async function guardar(emp, f, codigo) {
 function vistaHistorial() {
   const ul = h("ul", { class: "hist" }, h("li", {}, "Cargando…"));
   sb.from("cambios").select("*").order("creado_en", { ascending: false }).limit(modoAdmin() ? 400 : 60).then(({ data, error }) => {
-    if (error) { ul.replaceChildren(h("li", {}, "No se pudo cargar el historial")); return; }
+    if (error) { poner(ul, h("li", {}, "No se pudo cargar el historial")); return; }
     const ids = new Set(S.emps.map(e => e.id));
     data = data.filter(c => ids.has(c.empleado_id)).slice(0, 60);
-    ul.replaceChildren(...(data.length ? data.map(c => {
+    poner(ul, ...(data.length ? data.map(c => {
       const cuando = new Date(c.creado_en).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
       const txt = `${nombreEmp(c.empleado_id)} · ${fechaCorta(c.fecha)}: ${c.codigo_antes || "—"} → ${c.codigo_despues || "—"}`;
       return h("li", {}, txt, h("small", {}, `${cuando} · por ${nombreEmp(c.hecho_por)}`));
@@ -917,7 +920,7 @@ function vistaFormacion() {
           h("span", { class: "fnom" }, f.nombre), h("span", { class: "ffecha" }, tipoDe(f.nombre) === "Material" ? "" : fechaLarga(f.fecha))))
           : h("div", { class: "vacio" }, e.id === S.me.id ? "Aún no has añadido ninguna. Pulsa «+ Añadir»." : "Sin registros"));
     }).filter(Boolean);
-    lista.replaceChildren(...(bloques.length ? bloques : [h("div", { class: "vacio" }, "Nada coincide con la búsqueda.")]));
+    poner(lista, ...(bloques.length ? bloques : [h("div", { class: "vacio" }, "Nada coincide con la búsqueda.")]));
   };
   if (!S.abiertas) S.abiertas = new Set(S.emps.some(e => e.id === S.me.id) ? [S.me.id] : []);
   buscar.addEventListener("input", pintarLista);
@@ -967,7 +970,7 @@ function bloqueAvisos() {
     estado.textContent = on ? "Avisos activados en este móvil." : (Notification.permission === "denied" ? "Avisos bloqueados en los ajustes del móvil." : "Avisos desactivados en este móvil.");
     const bs = [h("button", { class: "btn full", onclick: async ev => { ev.target.disabled = true; if (on) await desactivarAvisos(); else await activarAvisos(); pintarEstado(); } }, on ? "Desactivar avisos" : "Activar avisos")];
     if (on) bs.push(h("button", { class: "btn sec full", onclick: async () => { const r = await navigator.serviceWorker.ready; r.showNotification("Tercio", { body: "Los avisos funcionan en este móvil ✔", icon: "icon-192.png" }); } }, "Probar en este móvil"));
-    caja.replaceChildren(estado, ...bs);
+    poner(caja, estado, ...bs);
   };
   pintarEstado();
   return caja;
@@ -1113,7 +1116,7 @@ function vistaInformes() {
       // último pico de cualquier año (la rotación sigue de un año a otro)
       return { e, n: mios.length, d: des.length, ult: ultimoPico(e.id, hoy) };
     }).sort((a, b) => (b.ult || "").localeCompare(a.ult || "") || a.e.orden - b.e.orden);   // primero quien lo hizo más recientemente; al final quien lleva más sin hacerlo
-    cont.replaceChildren(
+    poner(cont, 
       h("div", { class: "mes" },
         h("button", { disabled: S.infY <= S.anioMin, onclick: async () => { S.infY--; await cargarAnio(S.infY); dibujar(); } }, "‹"), h("b", {}, S.infY),
         h("button", { disabled: S.infY >= S.anioMax, onclick: async () => { S.infY++; await cargarAnio(S.infY); dibujar(); } }, "›")),
@@ -1132,8 +1135,7 @@ function vistaInformes() {
         null),
       plegable("desp", "Reparto de Z desplazado", h("p", { class: "sub" }, "Por parejas (siempre van dos). Ordenado igual que los picos: arriba la pareja desplazada más recientemente; abajo la que más tiempo lleva sin ir. Solo salen las parejas que ya han ido."),
         h("table", { class: "ipicos idesp" }, h("thead", {}, h("tr", {}, h("th", {}, "Pareja"), h("th", {}, "Veces"), h("th", {}, "Último"))),
-          h("tbody", {}, repartoDesp(hoy).length ? null : h("tr", {}, h("td", { colspan: 3 }, "Todavía no hay ningún Z desplazado este año.")), repartoDesp(hoy).map(x => h("tr", {}, h("td", {}, x.nombres), h("td", {}, h("b", {}, x.n)), h("td", {}, x.ult ? fechaLarga(x.ult) : "–")))))),
-      null);   // «Mi año» ya no va aquí: está en Calendario → Anual
+          h("tbody", {}, repartoDesp(hoy).length ? null : h("tr", {}, h("td", { colspan: 3 }, "Todavía no hay ningún Z desplazado este año.")), repartoDesp(hoy).map(x => h("tr", {}, h("td", {}, x.nombres), h("td", {}, h("b", {}, x.n)), h("td", {}, x.ult ? fechaLarga(x.ult) : "–")))))));   // «Mi año» ya no va aquí: está en Calendario → Anual
   };
   dibujar();
   Promise.all([cargarAnio(S.infY), cargarDesp()]).then(dibujar);   // refresca al entrar
@@ -1254,7 +1256,7 @@ function abrirPersonas() {
         h("b", {}, e.nombre), h("small", { class: "correo" }, e.email || "sin correo"),
         h("small", {}, (ROL[e.rol] || e.rol) + (e.admin ? " · admin" : "") + (e.hace_pico === false ? " · sin PICO" : "") + (e.pareja_id ? " · binomio: " + nombreEmp(e.pareja_id) : ""))),
       e.id === S.me.id ? null : h("button", { class: "btn mini " + (e.rol === "responsable" ? "sec" : ""), onclick: ev => cambiarRol(e, ev.currentTarget) }, e.rol === "responsable" ? "Quitar responsable" : "Hacer responsable"));
-    cont.replaceChildren(...[
+    poner(cont, ...[
       h("p", { class: "sub" }, `${activas.length} persona${activas.length === 1 ? "" : "s"} en ${S.dist.nombre} (${S.dist.turno}). Pulsa en alguien para cambiar sus datos, darle de baja o borrarlo.`),
       h("button", { class: "btn full", onclick: () => editarPersona(null, dibujar) }, "+ Dar de alta a una persona"),
       h("div", { class: "distlista" }, activas.map(fila)),
@@ -1434,14 +1436,14 @@ function bloqueCalendario() {
   const urlDe = t => `${SUPABASE_URL}/functions/v1/calendario?t=${t}`;
   const dibujar = token => {
     if (!token) {
-      caja.replaceChildren(h("button", { class: "btn sec full", onclick: async () => {
+      poner(caja, h("button", { class: "btn sec full", onclick: async () => {
         const t = nuevoToken(); const { error } = await sb.from("calendario_tokens").upsert({ empleado_id: S.me.id, token: t }, { onConflict: "empleado_id" });
         if (error) { toast("No se pudo crear el enlace"); return; } dibujar(t);
       } }, "Crear mi enlace"));
       return;
     }
     const url = urlDe(token), msg = h("small", { class: "det" }, "");
-    caja.replaceChildren(
+    poner(caja, 
       h("input", { type: "text", readonly: true, value: url, onfocus: ev => ev.target.select() }),
       h("div", { class: "fila" },
         h("button", { class: "btn sec mini", onclick: async () => { try { await navigator.clipboard.writeText(url); msg.textContent = "Enlace copiado ✔"; } catch (e) { msg.textContent = "Mantén pulsado el enlace para copiarlo."; } } }, "Copiar"),
@@ -1453,7 +1455,7 @@ function bloqueCalendario() {
       h("p", { class: "sub" }, "Android: si el botón no te lo añade, copia el enlace, abre calendar.google.com (desde el ordenador o con «Sitio de escritorio» en el navegador del móvil), entra en Otros calendarios → Desde URL y pégalo. Después aparece en la app Calendario de tu Android. Google lo actualiza solo, pero puede tardar hasta un día en reflejar los cambios."));
   };
   sb.from("calendario_tokens").select("token").eq("empleado_id", S.me.id).maybeSingle().then(({ data, error }) => {
-    if (error) caja.replaceChildren(h("p", { class: "sub" }, "No disponible todavía."));
+    if (error) poner(caja, h("p", { class: "sub" }, "No disponible todavía."));
     else dibujar(data ? data.token : null);
   });
   return caja;
