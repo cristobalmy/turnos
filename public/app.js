@@ -1015,6 +1015,13 @@ function trabajadosAnio(empId, y, propias, hoy) {
   }
   return [[n.M, "Mañanas"], [n.T, "Tardes"], [n.N, "Noches"], [n.M + n.T + n.N, "Total"]].map(([v, etq]) => h("div", {}, h("b", {}, v), h("small", {}, etq)));
 }
+// Apartados de Informes que se abren y cierran tocando el título. Empiezan cerrados; cada móvil recuerda cuáles dejaste abiertos.
+function plegable(id, titulo, ...contenido) {
+  const k = "infAbierto_" + id;
+  return h("div", { class: "pag ancho" },
+    h("details", { class: "infplegable", open: leerLS(k) === "1", ontoggle: ev => ponerLS(k, ev.target.open ? "1" : null) },
+      h("summary", {}, h("span", {}, titulo)), contenido));
+}
 // ---------- reparto de Z desplazado (DESP) ----------
 // Todos los DESP de cualquier año (para la fecha del último). Son pocos.
 async function cargarDesp() {
@@ -1084,8 +1091,7 @@ function vistaInformes() {
         h("button", { disabled: S.infY <= S.anioMin, onclick: async () => { S.infY--; await cargarAnio(S.infY); dibujar(); } }, "‹"), h("b", {}, S.infY),
         h("button", { disabled: S.infY >= S.anioMax, onclick: async () => { S.infY++; await cargarAnio(S.infY); dibujar(); } }, "›")),
       esResp() ? h("div", { class: "infpersona" }, h("label", {}, "Persona", sel)) : null,
-      h("div", { class: "pag ancho" },
-        h("h2", {}, S.infEmp === S.me.id ? "Mis días" : `Días de ${nombreEmp(S.infEmp)}`), esResp() ? null : h("p", { class: "sub" }, S.me.nombre),
+      plegable("dias", S.infEmp === S.me.id ? "Mis días" : `Días de ${nombreEmp(S.infEmp)}`, esResp() ? null : h("p", { class: "sub" }, S.me.nombre),
         h("p", { class: "sub" }, "Solo cuentan los días ya pasados."),
         h("div", { class: "itot" }, [
           [["CH", "CJ", "JS"], "CH · CJ · JS"], [["V1", "V2", "V3"], "Vacaciones"], [["AP"], "AP"], [["SS", "NAV"], "Semana Santa y Navidad"],
@@ -1093,13 +1099,11 @@ function vistaInformes() {
         h("h4", { class: "itit" }, "Días trabajados"),
         h("div", { class: "itot trab" }, trabajadosAnio(S.infEmp, S.infY, propias, hoy)),
         codigos.length ? tarjetas : h("p", { class: "det" }, "Todavía no hay días apuntados.")),
-      h("div", { class: "pag ancho" },
-        h("h2", {}, "Reparto de picos"), h("p", { class: "sub" }, "Ordenado por el último pico: arriba quien lo hizo más recientemente; abajo quien más tiempo lleva sin hacerlo (le tocaría antes)."),
+      plegable("picos", "Reparto de picos", h("p", { class: "sub" }, "Ordenado por el último pico: arriba quien lo hizo más recientemente; abajo quien más tiempo lleva sin hacerlo (le tocaría antes)."),
         h("table", { class: "ipicos" }, h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Picos"), h("th", {}, "Desplazado"), h("th", {}, "Último pico"))),
           h("tbody", {}, picosEmp.map(x => h("tr", {}, h("td", {}, x.e.nombre), h("td", {}, h("b", {}, x.n)), h("td", {}, x.d), h("td", {}, x.ult ? fechaLarga(x.ult) : "–"))))),
         null),
-      h("div", { class: "pag ancho" },
-        h("h2", {}, "Reparto de Z desplazado"), h("p", { class: "sub" }, "Por parejas (siempre van dos). Ordenado igual que los picos: arriba la pareja desplazada más recientemente; abajo la que más tiempo lleva sin ir. Solo salen las parejas que ya han ido."),
+      plegable("desp", "Reparto de Z desplazado", h("p", { class: "sub" }, "Por parejas (siempre van dos). Ordenado igual que los picos: arriba la pareja desplazada más recientemente; abajo la que más tiempo lleva sin ir. Solo salen las parejas que ya han ido."),
         h("table", { class: "ipicos idesp" }, h("thead", {}, h("tr", {}, h("th", {}, "Pareja"), h("th", {}, "Veces"), h("th", {}, "Último"))),
           h("tbody", {}, repartoDesp(hoy).length ? null : h("tr", {}, h("td", { colspan: 3 }, "Todavía no hay ningún Z desplazado este año.")), repartoDesp(hoy).map(x => h("tr", {}, h("td", {}, x.nombres), h("td", {}, h("b", {}, x.n)), h("td", {}, x.ult ? fechaLarga(x.ult) : "–")))))),
       // «Mi año» al final de la página, siempre abierto

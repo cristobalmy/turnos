@@ -415,3 +415,10 @@ table.res tbody th,table.res thead th:first-child{position:-webkit-sticky;positi
 table.res tbody th{background:var(--fondo)}
 table.res thead th:first-child{z-index:4;background:var(--azul-claro)}
 table.res td{position:relative;z-index:1}
+/* Informes: apartados desplegables */
+details.infplegable>summary{display:flex;align-items:center;gap:.6rem;cursor:pointer;list-style:none;font-size:1.25rem;font-weight:800;padding:.1rem 0;-webkit-tap-highlight-color:transparent}
+details.infplegable>summary::-webkit-details-marker{display:none}
+details.infplegable>summary span{flex:1}
+details.infplegable>summary::after{content:"▾";font-size:1rem;color:var(--azul2);transition:transform .2s}
+details.infplegable[open]>summary::after{transform:rotate(180deg)}
+details.infplegable[open]>summary{margin-bottom:.5rem}
