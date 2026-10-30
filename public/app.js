@@ -324,6 +324,7 @@ function pintar() {
   S._vistaPintada = S.vista;
   if (S.vista !== "cal") return;
   const nw = $app.querySelector(".wrap");
+  if (!nw) return;   // en «Mi año» no hay tabla del mes
   if (!S.yaScroll) {
     const hoy = $app.querySelector("th.hoy") || $app.querySelector("th.sel");
     if (hoy) nw.scrollLeft = Math.max(0, hoy.offsetLeft - nw.clientWidth / 2);
@@ -566,7 +567,7 @@ function exportarPDF() {
   setTimeout(() => window.print(), 80);
 }
 
-function vistaCalendario() {
+function vistaMes() {
   const nd = new Date(S.y, S.m + 1, 0).getDate(), hoy = hoyStr();
   const dias = Array.from({ length: nd }, (_, i) => i + 1);
   const cls = (d, f) => [new Date(S.y, S.m, d).getDay() % 6 === 0 ? "finde" : "", f === hoy ? "hoy" : "", f === S.sel ? "sel" : ""].join(" ");
@@ -977,7 +978,7 @@ function bloqueMiAnio(empId, y) {
   const cod = {};
   for (const r of S.infAnio[y] || []) if (r.empleado_id === empId) cod[r.fecha] = r.codigo;
   const hoy = hoyStr();
-  const irA = (m, f) => { S.y = y; S.m = m; S.sel = f; S.vista = "cal"; S.yaScroll = false; cargarMes().then(pintar); };
+  const irA = (m, f) => { S.y = y; S.m = m; S.sel = f; S.vista = "cal"; S.calModo = "mes"; S.yaScroll = false; cargarMes().then(pintar); };
   const meses = MESES.map((nombre, m) => {
     const nd = new Date(y, m + 1, 0).getDate(), hueco = (new Date(y, m, 1).getDay() + 6) % 7;
     const celdas = [];
@@ -1057,6 +1058,32 @@ function repartoDesp(hoy) {
   // Solo las parejas que tienen algún Z desplazado puesto en el año que se está viendo
   return Object.values(filas).filter(r => r.n > 0).map(r => ({ ...r, nombres: r.ps.map(p => p.nombre).join(" y ") }))
     .sort((a, b) => (b.ult || "").localeCompare(a.ult || "") || a.ps[0].orden - b.ps[0].orden);
+}
+// ---------- pestaña Calendario: «Mensual» (la tabla de siempre) o «Anual» (los 12 meses, como «Mi año» de Informes) ----------
+S.calModo = "mes";
+function vistaCalendario() {
+  const boton = (modo, txt) => h("button", { class: S.calModo === modo ? "on" : "", onclick: async () => {
+    if (S.calModo === modo) return;
+    S.calModo = modo; S.yaScroll = false;
+    if (modo === "anio") { if (!S.infY) S.infY = +hoyStr().slice(0, 4); if (!S.infEmp) S.infEmp = S.me.id; if (!S.infAnio[S.infY]) await cargarAnio(S.infY); }
+    pintar();
+  } }, txt);
+  const selector = h("div", { class: "calmodo", role: "tablist" }, boton("mes", "Mensual"), boton("anio", "Anual"));
+  return h("div", {}, selector, S.calModo === "anio" ? vistaAnioCal() : vistaMes());
+}
+function vistaAnioCal() {
+  const y = S.infY, emp = S.infEmp;
+  const cambiaAnio = async d => { S.infY += d; await cargarAnio(S.infY); pintar(); };
+  const sel = esResp() ? h("div", { class: "infpersona" }, h("label", {}, "Persona",
+    h("select", { class: "infsel", onchange: ev => { S.infEmp = +ev.target.value; pintar(); } },
+      S.emps.map(e => h("option", { value: e.id, selected: e.id === emp }, e.nombre))))) : null;
+  return h("div", {},
+    h("div", { class: "mes" },
+      h("button", { disabled: y <= S.anioMin, onclick: () => cambiaAnio(-1) }, "‹"), h("b", {}, y),
+      h("button", { disabled: y >= S.anioMax, onclick: () => cambiaAnio(1) }, "›")),
+    sel,
+    h("div", { class: "pag anchoanio" },
+      h("h2", {}, emp === S.me.id ? "Mi año" : `Año de ${nombreEmp(emp)}`), bloqueMiAnio(emp, y)));
 }
 // ---------- informes ----------
 S.infY = 0; S.infEmp = 0;
