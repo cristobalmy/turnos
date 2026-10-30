@@ -1133,9 +1133,7 @@ function vistaInformes() {
       plegable("desp", "Reparto de Z desplazado", h("p", { class: "sub" }, "Por parejas (siempre van dos). Ordenado igual que los picos: arriba la pareja desplazada más recientemente; abajo la que más tiempo lleva sin ir. Solo salen las parejas que ya han ido."),
         h("table", { class: "ipicos idesp" }, h("thead", {}, h("tr", {}, h("th", {}, "Pareja"), h("th", {}, "Veces"), h("th", {}, "Último"))),
           h("tbody", {}, repartoDesp(hoy).length ? null : h("tr", {}, h("td", { colspan: 3 }, "Todavía no hay ningún Z desplazado este año.")), repartoDesp(hoy).map(x => h("tr", {}, h("td", {}, x.nombres), h("td", {}, h("b", {}, x.n)), h("td", {}, x.ult ? fechaLarga(x.ult) : "–")))))),
-      // «Mi año» al final de la página, siempre abierto
-      h("div", { class: "pag anchoanio" },
-        h("h2", {}, S.infEmp === S.me.id ? "Mi año" : `Año de ${nombreEmp(S.infEmp)}`), bloqueMiAnio(S.infEmp, S.infY)));
+      null);   // «Mi año» ya no va aquí: está en Calendario → Anual
   };
   dibujar();
   Promise.all([cargarAnio(S.infY), cargarDesp()]).then(dibujar);   // refresca al entrar
