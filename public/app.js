@@ -1040,8 +1040,6 @@ function repartoDesp(hoy) {
   const clave = ps => ps.map(p => p.id).sort((x, y) => x - y).join("-");
   const filas = {};
   const fila = ps => filas[clave(ps)] = filas[clave(ps)] || { ps: [...ps].sort((a, b) => a.orden - b.orden), n: 0, ult: "" };
-  // Los binomios actuales del distrito salen siempre (aunque no hayan ido nunca)
-  for (const e of S.emps) { const p = S.emps.find(x => x.id === e.pareja_id); if (p && e.orden < p.orden) fila([e, p]); }
   const delDistrito = ps => ps.some(p => p.distrito_id === S.dist.id);
   for (const { f, ps } of parejasDesp(hoy)) {
     if (!delDistrito(ps)) continue;
@@ -1049,7 +1047,8 @@ function repartoDesp(hoy) {
     if (f.startsWith(String(S.infY))) r.n++;
     if (f > r.ult) r.ult = f;
   }
-  return Object.values(filas).map(r => ({ ...r, nombres: r.ps.map(p => p.nombre).join(" y ") }))
+  // Solo las parejas que tienen algún Z desplazado puesto en el año que se está viendo
+  return Object.values(filas).filter(r => r.n > 0).map(r => ({ ...r, nombres: r.ps.map(p => p.nombre).join(" y ") }))
     .sort((a, b) => (b.ult || "").localeCompare(a.ult || "") || a.ps[0].orden - b.ps[0].orden);
 }
 // ---------- informes ----------
@@ -1100,9 +1099,9 @@ function vistaInformes() {
           h("tbody", {}, picosEmp.map(x => h("tr", {}, h("td", {}, x.e.nombre), h("td", {}, h("b", {}, x.n)), h("td", {}, x.d), h("td", {}, x.ult ? fechaLarga(x.ult) : "–"))))),
         null),
       h("div", { class: "pag ancho" },
-        h("h2", {}, "Reparto de Z desplazado"), h("p", { class: "sub" }, "Por parejas (siempre van dos). Ordenado igual que los picos: arriba la pareja desplazada más recientemente; abajo la que más tiempo lleva sin ir."),
+        h("h2", {}, "Reparto de Z desplazado"), h("p", { class: "sub" }, "Por parejas (siempre van dos). Ordenado igual que los picos: arriba la pareja desplazada más recientemente; abajo la que más tiempo lleva sin ir. Solo salen las parejas que ya han ido."),
         h("table", { class: "ipicos idesp" }, h("thead", {}, h("tr", {}, h("th", {}, "Pareja"), h("th", {}, "Veces"), h("th", {}, "Último"))),
-          h("tbody", {}, repartoDesp(hoy).map(x => h("tr", {}, h("td", {}, x.nombres), h("td", {}, h("b", {}, x.n)), h("td", {}, x.ult ? fechaLarga(x.ult) : "–")))))),
+          h("tbody", {}, repartoDesp(hoy).length ? null : h("tr", {}, h("td", { colspan: 3 }, "Todavía no hay ningún Z desplazado este año.")), repartoDesp(hoy).map(x => h("tr", {}, h("td", {}, x.nombres), h("td", {}, h("b", {}, x.n)), h("td", {}, x.ult ? fechaLarga(x.ult) : "–")))))),
       // «Mi año» al final de la página, siempre abierto
       h("div", { class: "pag anchoanio" },
         h("h2", {}, S.infEmp === S.me.id ? "Mi año" : `Año de ${nombreEmp(S.infEmp)}`), bloqueMiAnio(S.infEmp, S.infY)));
