@@ -677,12 +677,13 @@ function bloqueNota(f) {
   ta.value = S.notas[f] || "";
   const msg = h("small", { class: "det" }, "");
   const guardarNota = async ev => {
-    ev.currentTarget.disabled = true;
+    const bt = ev.currentTarget;   // hay que guardarlo antes de esperar: después del «await» el navegador lo deja vacío
+    bt.disabled = true;
     const txt = ta.value.trim();
     const { error } = txt
       ? await sb.from("notas").upsert({ empleado_id: S.me.id, fecha: f, texto: txt, actualizado: new Date().toISOString() }, { onConflict: "empleado_id,fecha" })
       : await sb.from("notas").delete().eq("empleado_id", S.me.id).eq("fecha", f);
-    ev.currentTarget.disabled = false;
+    bt.disabled = false;
     if (error) { msg.textContent = "No se pudo guardar la nota."; return; }
     if (txt) S.notas[f] = txt; else delete S.notas[f];
     msg.textContent = txt ? "Nota guardada ✔" : "Nota borrada";
@@ -1266,9 +1267,9 @@ function abrirPersonas() {
           h("button", { class: "pcol", onclick: () => editarPersona(e, dibujar) }, h("b", {}, e.nombre), h("small", {}, e.pareja_id ? "binomio: " + nombreEmp(e.pareja_id) : "sin binomio")),
           h("button", { class: "btn mini", onclick: async ev => {
             if (!confirm(`¿${e.nombre} vuelve al equipo? Volverá a salir en el calendario y a contar en el tercio y el PICO.`)) return;
-            ev.currentTarget.disabled = true;
+            const bt = ev.currentTarget; bt.disabled = true;
             const { error } = await sb.from("empleados").update({ fuera: false }).eq("id", e.id);
-            if (error) { ev.currentTarget.disabled = false; toast("No se pudo: " + error.message, 6000); return; }
+            if (error) { bt.disabled = false; toast("No se pudo: " + error.message, 6000); return; }
             await recargarEmpleados(); dibujar(); pintar(); toast(`${e.nombre} vuelve al equipo`, 3000);
           } }, "Vuelve al equipo"))))] : null,
       bajas.length ? [h("h4", {}, "De baja"), h("div", { class: "distlista" }, bajas.map(e => h("button", { class: "btn sec full persona baja", onclick: async ev => {
@@ -1337,10 +1338,10 @@ function editarPersona(emp, alVolver) {
   };
   const baja = emp && emp.id !== S.me.id ? h("button", { class: "btn sec", onclick: async ev => {
     if (!confirm(`¿Dar de baja a ${emp.nombre}? Dejará de poder entrar y de salir en el calendario. Sus días apuntados se conservan y se puede reactivar.`)) return;
-    ev.currentTarget.disabled = true;
+    const bt = ev.currentTarget; bt.disabled = true;
     await ponerPareja(emp.id, null);
     const { error } = await sb.from("empleados").update({ activo: false }).eq("id", emp.id);
-    if (error) { ev.currentTarget.disabled = false; err.textContent = "No se pudo: " + error.message; return; }
+    if (error) { bt.disabled = false; err.textContent = "No se pudo: " + error.message; return; }
     await recargarEmpleados(); dlg.close(); if (alVolver) alVolver();
   } }, "Dar de baja") : null;
   const borrar = emp && emp.id !== S.me.id ? h("button", { class: "btn peligro", onclick: async ev => {
@@ -1392,7 +1393,7 @@ function avisoAlta(nombre, email, clave, cuentaNueva) {
     h("pre", { class: "mensajeAlta" }, texto),
     h("div", { class: "fila" },
       h("button", { class: "btn sec", onclick: () => dlg.close() }, "Cerrar"),
-      h("button", { class: "btn", onclick: async ev => { try { await navigator.clipboard.writeText(texto); ev.currentTarget.textContent = "Copiado ✔"; } catch (e) { toast("No se pudo copiar; selecciona el texto a mano"); } } }, "Copiar mensaje")));
+      h("button", { class: "btn", onclick: async ev => { const bt = ev.currentTarget; try { await navigator.clipboard.writeText(texto); bt.textContent = "Copiado ✔"; } catch (e) { toast("No se pudo copiar; selecciona el texto a mano"); } } }, "Copiar mensaje")));
   dlg.addEventListener("close", () => { dlg.remove(); pintar(); });
   document.body.append(dlg); dlg.showModal();
 }
