@@ -83,4 +83,9 @@ eq(avisoPico(dD, "2026-10-20", ep2, { 3: "V1", 5: "AP" }, cP, { 6: "2026-09-01" 
 eq(avisoPico(dD, "2026-10-20", ep2, { 3: "V1", 5: "AP", 2: "V1", 4: "PICO" }, cP, {}), null, "pico: si ya está puesto no avisa");
 eq(avisoPico(dD, "2026-10-20", ep2, { 2: "V1", 3: "V1", 7: "DESP" }, cP, {}).body.endsWith("trabajan 5: hace falta PICO. Recomendado: P4"), true, "pico: DESP cuenta como que trabaja, no como PICO; y quien no hace PICO no sale");
 eq(avisoPico(dD, "2026-10-22", ep2, {}, cP, {}), null, "pico: día libre del ciclo no avisa");
+const codsS = { ...codsV, SS: { tipo: "Ausencia Justificada" }, NAV: { tipo: "Ausencia Justificada" } };
+const asigS = { "1|2026-10-20": "SS", "2|2026-10-20": "NAV", "3|2026-10-20": "V1", "4|2026-10-20": "AP" };
+eq(recomendarQuitar(emps, codsS, asigS, dias, {}, "2026-10-20").map(x => x.e.nombre + " " + x.c), ["Gustavo AP", "Nacho V1"], "SS y NAV nunca salen para quitarse");
+eq(lineaTercio(emps, codsS, asigS, dias, {}, "2026-10-20", 2, true), "⚠️ Tercio superado el 20/10: 4 de 2. Deben quitarse 2: 1º Gustavo (AP), 2º Nacho (V1)", "SS y NAV sí cuentan en el tercio (4 de 2), pero no se recomienda quitarlos");
+
 process.exit(fallos ? 1 : 0);

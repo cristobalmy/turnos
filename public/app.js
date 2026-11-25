@@ -408,7 +408,7 @@ async function cargarAnio(y) {
 }
 const esAus = c => !!(c && S.cods[c] && S.cods[c].tipo === "Ausencia Justificada");
 const esVac = c => ["V1", "V2", "V3"].includes(c);
-// Al superar el tercio se quitan primero los permisos (AP, CJ, CH, JS, SS, NAV…), todos al mismo nivel,
+// Al superar el tercio se quitan primero los permisos (AP, CJ, CH, JS…; SS y NAV nunca), todos al mismo nivel,
 // y por último las vacaciones, que entre ellas tienen prioridad V1 sobre V2 y V2 sobre V3 (se quita antes V3).
 const nivelQuitar = c => ({ V3: 2, V2: 3, V1: 4 })[c] ?? 0;
 // Días ya disfrutados (anteriores a hoy) en el año actual, contados aparte: para las vacaciones, los días de vacaciones;
@@ -434,8 +434,11 @@ function rachaAusencia(empId, f, A = R.asig, D = R.dias) {
 }
 // Recomendación (orden de "quién debe quitarse"): 1) permisos (AP, CJ, CH, JS…), V3, V2 y V1; 2) dentro de cada uno, quien más días ha disfrutado
 // este año (vacaciones o permisos, contados aparte); 3) orden de la lista.
+// SS y NAV (permisos anuales de Semana Santa y Navidad) ocupan sitio en el tercio, pero nunca salen para quitarse:
+// el orden entre ellos lo pone el equipo (decisión del 25/11/2026).
+const SIN_QUITAR = ["SS", "NAV"];
 function recomendarQuitar(f, A = R.asig, D = R.dias) {
-  const lista = S.emps.filter(e => esAus(A[e.id + "|" + f])).map(e => {
+  const lista = S.emps.filter(e => esAus(A[e.id + "|" + f]) && !SIN_QUITAR.includes(A[e.id + "|" + f])).map(e => {
     const c = A[e.id + "|" + f];
     return { e, c, vac: nivelQuitar(c), racha: rachaAusencia(e.id, f, A, D), tot: diasCogidos(e.id, c) };
   });
@@ -669,7 +672,7 @@ function bloqueQuitar() {
   }
   return h("div", { class: "picoreco quitareco" }, h("div", { class: "pt" }, "Tercio superado: quién debe quitarse"),
     lineas.length ? lineas : h("div", { class: "pl" }, h("span", { class: "pv" }, S.y === +hoy.slice(0, 4) && S.m === +hoy.slice(5, 7) - 1 ? "Ningún día que queda de este mes supera el tercio." : "Ningún día de este mes supera el tercio.")),
-    h("small", { class: "det" }, "Solo días de hoy en adelante. Orden para quitarse: AP, CJ, CH y JS (todos igual); después V3, V2 y por último V1. Dentro de cada uno, primero quien más días lleva este año: AP + CJ + CH + JS se suman en un solo cómputo; las vacaciones se cuentan aparte. El número entre paréntesis son esos días. Toca un día para ver su resumen."));
+    h("small", { class: "det" }, "Solo días de hoy en adelante. Orden para quitarse: AP, CJ, CH y JS (todos igual); después V3, V2 y por último V1. SS y NAV cuentan en el tercio pero no salen aquí (su orden lo pone el equipo). Dentro de cada uno, primero quien más días lleva este año: AP + CJ + CH + JS se suman en un solo cómputo; las vacaciones se cuentan aparte. El número entre paréntesis son esos días. Toca un día para ver su resumen."));
 }
 
 const GRUPOS = [["a", "Vacaciones y permisos"], ["t", "Trabajo"], ["m", "Modificadores"], ["e", "Otros"]];
