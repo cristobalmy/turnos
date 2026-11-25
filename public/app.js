@@ -97,7 +97,10 @@ async function cambiarDistrito(d) {
 }
 
 // ---------- acceso ----------
+// En el móvil la barra de abajo va suelta en la página (fuera de #app): en las pantallas sin barra hay que quitarla.
+const quitarBarra = () => { if (S.navTabs) S.navTabs.remove(); };
 function pantallaLogin(msg) {
+  quitarBarra();
   const email = h("input", { type: "email", placeholder: "Correo electrónico", autocomplete: "username", required: true });
   const pass = h("input", { type: "password", placeholder: "Contraseña", autocomplete: "current-password", required: true });
   const err = h("div", { class: "error" }, msg || "");
@@ -119,6 +122,7 @@ function pantallaLogin(msg) {
 }
 
 function pantallaNuevaClave(primera) {
+  quitarBarra();
   const p1 = h("input", { type: "password", placeholder: "Contraseña nueva (mín. 8 caracteres)", autocomplete: "new-password", required: true, minlength: 8 });
   const p2 = h("input", { type: "password", placeholder: "Repite la contraseña", autocomplete: "new-password", required: true });
   const err = h("div", { class: "error" }, "");
@@ -179,6 +183,7 @@ async function arrancar() {
   pintar();
 }
 function sinAcceso(msg) {
+  quitarBarra();
   poner($app, h("div", { class: "login" }, h("h1", {}, "Tercio"), h("p", { class: "error" }, msg),
     h("button", { class: "btn", onclick: salir }, "Salir")));
 }
@@ -300,6 +305,9 @@ const TURNO_NOMBRE = { M: "Mañana", T: "Tarde", N: "Noche", S: "Libre", L: "Lib
 const tl = t => (t === "S" ? "L" : t || "");      // la "S" (saliente) se muestra como "L" (libre)
 const DLARGO = ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"];
 
+const MOVIL = matchMedia("(max-width:700px)");
+// si cambia el ancho (girar la tablet, ventana del ordenador) la barra pasa de abajo a la cabecera o al revés
+MOVIL.addEventListener("change", () => { if (S.navTabs && S.me && S.navTabs.isConnected) pintar(); });
 function cabecera() {
   // La barra de pestañas se crea una sola vez y se reutiliza: así sus iconos no se vuelven a dibujar en cada cambio
   // (en el iPhone, al rehacerlos, a veces alguno no llegaba a verse). Solo se actualiza cuál está marcada.
@@ -308,6 +316,12 @@ function cabecera() {
     S.navTabs = h("nav", { class: "tabs" }, b("res", "Resumen"), b("cal", "Calendario"), b("form", "Formación"), b("inf", "Informes"), b("hist", "Cambios"), b("cuenta", "Cuenta"));
   }
   for (const bt of S.navTabs.children) bt.classList.toggle("on", bt.dataset.v === S.vista);
+  // Móvil: la barra va abajo, fija, colgada directamente de la página y sin moverla nunca de sitio.
+  // Antes iba dentro de la cabecera (que se queda pegada arriba) y se recolocaba en cada repintado:
+  // en el iPhone (iOS 26) eso hacía que a veces se descuadrara o se quedara a media pantalla.
+  // Ordenador: sigue dentro de la cabecera, como pestañas.
+  const movil = MOVIL.matches;
+  if (movil && S.navTabs.parentNode !== document.body) document.body.append(S.navTabs);
   return h("header", {},
     modoAdmin()
       ? h("div", { class: "marca admin" },
@@ -315,7 +329,7 @@ function cabecera() {
           h("button", { class: "seldis", title: "Elegir distrito", onclick: ev => menuDistritos(ev.currentTarget) }, h("span", {}, S.dist.nombre), h("b", {}, "▾")),
           h("span", { class: "adm" }, "ADMIN"))
       : h("div", { class: "marca" }, h("i", {}, S.dist.turno), S.dist.nombre),
-    S.navTabs,
+    movil ? null : S.navTabs,
     h("span", { class: "yo" }, S.me.nombre));
 }
 function pintar() {
